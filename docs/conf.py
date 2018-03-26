@@ -31,7 +31,7 @@ for item in os.listdir(parent):
     if item.endswith('.egg'):
         sys.path.append(os.path.join(parent, item))
 
-version_txt = os.path.join(parent, 'supervisor/version.txt')
+version_txt = os.path.join(parent, 'adminservice/version.txt')
 supervisor_version = open(version_txt).read().strip()
 
 # General configuration
@@ -163,7 +163,7 @@ html_last_updated_fmt = '%b %d, %Y'
 #html_file_suffix = ''
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'supervisor'
+htmlhelp_basename = 'adminservice'
 
 
 # Options for LaTeX output
@@ -179,7 +179,7 @@ htmlhelp_basename = 'supervisor'
 # (source start file, target name, title,
 #  author, document class [howto/manual]).
 latex_documents = [
-  ('index', 'supervisor.tex', 'supervisor Documentation',
+  ('index', 'adminservice.tex', 'adminservice Documentation',
    'Supervisor Developers', 'manual'),
 ]
 

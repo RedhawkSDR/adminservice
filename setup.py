@@ -16,7 +16,7 @@ import os
 import sys
 
 if sys.version_info[:2] < (2, 4) or sys.version_info[0] > 2:
-    msg = ("Supervisor requires Python 2.4 or later but does not work on "
+    msg = ("AdminService requires Python 2.4 or later but does not work on "
            "any version of Python 3.  You are using version %s.  Please "
            "install using a supported version." % sys.version)
     sys.stderr.write(msg)
@@ -36,7 +36,7 @@ try:
     CHANGES = open(os.path.join(here, 'CHANGES.txt')).read()
 except:
     README = """\
-Supervisor is a client/server system that allows its users to
+AdminService is a client/server system that allows its users to
 control a number of processes on UNIX-like operating systems. """
     CHANGES = ''
 
@@ -57,14 +57,14 @@ CLASSIFIERS = [
     "Programming Language :: Python :: 2.7",
 ]
 
-version_txt = os.path.join(here, 'supervisor/version.txt')
-supervisor_version = open(version_txt).read().strip()
+version_txt = os.path.join(here, 'adminservice/version.txt')
+adminservice_version = open(version_txt).read().strip()
 
 dist = setup(
-    name='supervisor',
-    version=supervisor_version,
+    name='adminservice',
+    version=adminservice_version,
     license='BSD-derived (http://www.repoze.org/LICENSE.txt)',
-    url='http://supervisord.org/',
+    url='http://adminserviced.org/',
     description="A system for controlling process state under UNIX",
     long_description=README + '\n\n' + CHANGES,
     classifiers=CLASSIFIERS,
@@ -76,14 +76,14 @@ dist = setup(
     tests_require=['mock >= 0.5.0'],
     include_package_data=True,
     zip_safe=False,
-    namespace_packages=['supervisor'],
-    test_suite="supervisor.tests",
+    namespace_packages=['adminservice'],
+    test_suite="adminservice.tests",
     entry_points={
         'console_scripts': [
-         'supervisord = supervisor.supervisord:main',
-         'supervisorctl = supervisor.supervisorctl:main',
-         'echo_supervisord_conf = supervisor.confecho:main',
-         'pidproxy = supervisor.pidproxy:main',
+         'adminserviced = adminservice.adminserviced:main',
+         'rhadmin = adminservice.rhadmin:main',
+         'echo_adminserviced_conf = adminservice.confecho:main',
+         'pidproxy = adminservice.pidproxy:main',
         ],
     },
 )
