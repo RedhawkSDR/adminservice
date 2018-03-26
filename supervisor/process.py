@@ -5,6 +5,8 @@ import errno
 import shlex
 import traceback
 import signal
+from exceptions import Exception
+from subprocess import call
 
 from supervisor.medusa import asyncore_25 as asyncore
 
@@ -14,6 +16,7 @@ from supervisor.states import getProcessStateDescription
 from supervisor.states import STOPPED_STATES
 
 from supervisor.options import decode_wait_status
+from supervisor.options import readFile
 from supervisor.options import signame
 from supervisor.options import ProcessException, BadCommand
 
@@ -21,6 +24,7 @@ from supervisor.dispatchers import EventListenerStates
 
 from supervisor import events
 
+from supervisor.datatypes import integer
 from supervisor.datatypes import RestartUnconditionally
 
 from supervisor.socket_manager import SocketManager
@@ -101,7 +105,9 @@ class Subprocess:
         make sure it exists / is executable, raising a ProcessException
         if not """
         try:
-            commandargs = shlex.split(self.config.command)
+            cmd = self.config.get_start_command()
+            commandargs = shlex.split(cmd)
+            self.config.options.logger.debug("Start command: %s" % cmd)
         except ValueError, e:
             raise BadCommand("can't parse command %r: %s" % \
                 (self.config.command, str(e)))
@@ -273,11 +279,14 @@ class Subprocess:
             options.dup2(self.pipes['child_stdout'], 2)
         else:
             options.dup2(self.pipes['child_stderr'], 2)
+        # TODO!! these were commented out... should they be here?
         for i in range(3, options.minfds):
             options.close_fd(i)
 
     def _spawn_as_child(self, filename, argv):
         options = self.config.options
+        has_pid = hasattr(self.config, "pid_file")
+        exit_code = 127
         try:
             # prevent child from receiving signals sent to the
             # parent by calling os.setpgrp to create a new process
@@ -305,7 +314,7 @@ class Subprocess:
             env['SUPERVISOR_ENABLED'] = '1'
             serverurl = self.config.serverurl
             if serverurl is None: # unset
-                serverurl = self.config.options.serverurl # might still be None
+                serverurl = options.serverurl # might still be None
             if serverurl:
                 env['SUPERVISOR_SERVER_URL'] = serverurl
             env['SUPERVISOR_PROCESS_NAME'] = self.config.name
@@ -329,29 +338,73 @@ class Subprocess:
             try:
                 if self.config.umask is not None:
                     options.setumask(self.config.umask)
-                options.execve(filename, argv, env)
+                self.config.alive = True
+                if has_pid:
+                    spawn_val = options.spawnve(os.P_WAIT, argv[0], argv, env)
+                    options.logger.trace("spawnve return for %s: %d" % (self.config.name, spawn_val))
+                    
+                    # Give the process some time to start up
+                    time.sleep(3)
+                    
+                    # Check status every second
+                    while self.config.check_status():
+                        exit_code = 0
+                        time.sleep(1)
+                else:
+                    # This call won't return
+                    options.execve(argv[0], argv, env)
             except OSError, why:
                 code = errno.errorcode.get(why.args[0], why.args[0])
-                msg = "couldn't exec %s: %s\n" % (argv[0], code)
-                options.write(2, "supervisor: " + msg)
+                self.config.alive = False
+                msg = "supervisor: couldn't exec %s: %s\n" % (argv[0], code)
+                options.write(2, msg)
             except:
-                (file, fun, line), t,v,tbinfo = asyncore.compact_traceback()
-                error = '%s, %s: file: %s line: %s' % (t, v, file, line)
-                msg = "couldn't exec %s: %s\n" % (filename, error)
-                options.write(2, "supervisor: " + msg)
+                (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
+                self.config.alive = False
+                error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
+                msg = "supervisor: couldn't exec %s: %s\n" % (filename, error)
+                options.write(2, msg)
 
-            # this point should only be reached if execve failed.
+            # this point should only be reached if execve failed or the spawnve'd process is finished.
             # the finally clause will exit the child process.
-
+        except Exception, e:
+            print e
         finally:
-            options.write(2, "supervisor: child process was not spawned\n")
-            options._exit(127) # exit process with code for spawn failure
+            if exit_code != 0:
+                options.write(2, "supervisor: child process was not spawned\n")
+            options._exit(exit_code) # exit process with code for spawn failure
+            
 
     def stop(self):
         """ Administrative stop """
         self.administrative_stop = True
         self.laststopreport = 0
-        return self.kill(self.config.stopsignal)
+
+        self.run_script(self.config.stop_pre_script)
+                    
+        killval = self.kill(self.config.stopsignal)
+        self.config.alive = False
+
+        self.run_script(self.config.stop_post_script)
+
+        return killval
+
+    def run_script(self, script_to_run):
+        if script_to_run is not None:
+            pre_files = [script_to_run]
+            if os.path.isdir(script_to_run):
+                pre_files = os.listdir(script_to_run)
+            try:
+                for script in pre_files:
+                    if os.path.exists(script):
+                        call(["/bin/bash", script])
+            except OSError, e:
+                self.config.options.write(2, "supervisor: unable to execute script(s) %s: %s" % (pre_files, repr(e)))
+            except:
+                (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
+                error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
+                msg = "supervisor: couldn't run script at %s: %s\n" % (script_to_run, error)
+                self.config.options.write(2, msg)
 
     def stop_report(self):
         """ Log a 'waiting for x to stop' message with throttling. """
@@ -377,21 +430,32 @@ class Subprocess:
         """
         now = time.time()
         options = self.config.options
+        detached_pid = None
+        stop_command = None
+        
+        if hasattr(self.config, "pid_file"):
+            try:
+                detached_pid = integer(readFile(self.config.pid_file, 0, 1000).strip())
+                options.logger.debug("Found detached pid %s for native pid %s" % (detached_pid, self.pid))
+            except Exception, e:
+                stop_command = self.config.get_stop_command()
+                if stop_command is not None:
+                    options.logger.debug("Pid file isn't an integer, using stop command instead %s for %s" % (stop_command, self.pid))
+                else:
+                    raise e
 
         # If the process is in BACKOFF and we want to stop or kill it, then
         # BACKOFF -> STOPPED.  This is needed because if startretries is a
         # large number and the process isn't starting successfully, the stop
         # request would be blocked for a long time waiting for the retries.
         if self.state == ProcessStates.BACKOFF:
-            msg = ("Attempted to kill %s, which is in BACKOFF state." %
-                   (self.config.name,))
+            msg = "Attempted to kill %s, which is in BACKOFF state." % self.config.name
             options.logger.debug(msg)
             self.change_state(ProcessStates.STOPPED)
             return None
 
         if not self.pid:
-            msg = ("attempted to kill %s with sig %s but it wasn't running" %
-                   (self.config.name, signame(sig)))
+            msg = "Attempted to kill %s with sig %s but it wasn't running" % (self.config.name, signame(sig))
             options.logger.debug(msg)
             return msg
 
@@ -406,7 +470,7 @@ class Subprocess:
         if killasgroup:
             as_group = "process group "
 
-        options.logger.debug('killing %s (pid %s) %swith signal %s'
+        options.logger.debug('Killing %s (pid %s) %swith signal %s'
                              % (self.config.name,
                                 self.pid,
                                 as_group,
@@ -429,6 +493,17 @@ class Subprocess:
             pid = -self.pid
 
         try:
+            if detached_pid is not None:
+                try:
+                    options.kill(detached_pid, sig)
+                except Exception, e:
+                    options.logger.warn("Problem killing detached pid %d: %s" % (detached_pid, e))
+            if stop_command is not None:
+                try:
+                    val = os.system(stop_command)
+                    options.logger.debug("Stop command for %s had return code of %s" % (pid, val))
+                except Exception, e:
+                    options.logger.warn("Problem running stop command for %s: %s" % (pid, e))
             options.kill(pid, sig)
         except:
             tb = traceback.format_exc()
@@ -566,7 +641,7 @@ class Subprocess:
     def set_uid(self):
         if self.config.uid is None:
             return
-        msg = self.config.options.drop_privileges(self.config.uid)
+        msg = self.config.options.drop_privileges(self.config.uid, self.config.gid)
         return msg
 
     def __cmp__(self, other):
@@ -591,7 +666,7 @@ class Subprocess:
         if self.config.options.mood > SupervisorStates.RESTARTING:
             # dont start any processes if supervisor is shutting down
             if state == ProcessStates.EXITED:
-                if self.config.autorestart:
+                if self.config.is_enabled() and self.config.autorestart:
                     if self.config.autorestart is RestartUnconditionally:
                         # EXITED -> STARTING
                         self.spawn()
@@ -600,11 +675,11 @@ class Subprocess:
                             # EXITED -> STARTING
                             self.spawn()
             elif state == ProcessStates.STOPPED and not self.laststart:
-                if self.config.autostart:
+                if self.config.is_enabled() and self.config.autostart:
                     # STOPPED -> STARTING
                     self.spawn()
             elif state == ProcessStates.BACKOFF:
-                if self.backoff <= self.config.startretries:
+                if self.config.is_enabled() and self.backoff <= self.config.startretries:
                     if now > self.delay:
                         # BACKOFF -> STARTING
                         self.spawn()
@@ -701,6 +776,7 @@ class FastCGISubprocess(Subprocess):
             options.dup2(self.pipes['child_stdout'], 2)
         else:
             options.dup2(self.pipes['child_stderr'], 2)
+        #TODO - these were commented out...should they be here?
         for i in range(3, options.minfds):
             options.close_fd(i)
 
@@ -760,7 +836,9 @@ class ProcessGroupBase:
 
 class ProcessGroup(ProcessGroupBase):
     def transition(self):
-        for proc in self.processes.values():
+        procs = self.processes.values()[:]
+        procs.sort()
+        for proc in procs:
             proc.transition()
 
 class FastCGIProcessGroup(ProcessGroup):

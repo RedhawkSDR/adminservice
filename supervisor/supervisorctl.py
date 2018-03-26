@@ -649,12 +649,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
         if not self.ctl.upcheck():
             return
         names = arg.split()
+        infos = []
         if not names:
             pid = supervisor.getPID()
-            self.ctl.output(str(pid))
+            self.ctl.output("adminserviced: %s" % pid)
         elif 'all' in names:
-            for info in supervisor.getAllProcessInfo():
-                self.ctl.output(str(info['pid']))
+            infos.extend(supervisor.getAllProcessInfo())
         else:
             for name in names:
                 try:
@@ -665,7 +665,21 @@ class DefaultControllerPlugin(ControllerPluginBase):
                     else:
                         raise
                 else:
-                    self.ctl.output(str(info['pid']))
+                    infos.extend(info)
+        self._show_pids(infos)
+                    
+    def _show_pids(self, process_infos):
+        namespecs, maxlen = [], 30
+        for i, info in enumerate(process_infos):
+            namespecs.append(make_namespec(info['group'], info['name']))
+            if len(namespecs[i]) > maxlen:
+                maxlen = len(namespecs[i])
+
+        template = '%(namespec)-' + str(maxlen+3) + 's%(pid)-10s'
+        for i, info in enumerate(process_infos):
+            line = template % {'namespec': namespecs[i],
+                               'pid': info['pid']}
+            self.ctl.output(line)
 
     def help_pid(self):
         self.ctl.output("pid\t\t\tGet the PID of supervisord.")
@@ -707,6 +721,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
             self.help_start()
             return
 
+        force = 'False'
+        if '-f' in names:
+            force = 'True'
+            names.remove('-f')
         if 'all' in names:
             results = supervisor.startAllProcesses()
             for result in results:
@@ -718,7 +736,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 group_name, process_name = split_namespec(name)
                 if process_name is None:
                     try:
-                        results = supervisor.startProcessGroup(group_name)
+                        results = supervisor.startProcessGroup(group_name, force)
                         for result in results:
                             result = self._startresult(result)
                             self.ctl.output(result)
@@ -730,7 +748,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                             raise
                 else:
                     try:
-                        result = supervisor.startProcess(name)
+                        result = supervisor.startProcess(name, force)
                     except xmlrpclib.Fault, e:
                         error = self._startresult({'status': e.faultCode,
                                                    'name': process_name,

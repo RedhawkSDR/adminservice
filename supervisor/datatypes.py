@@ -7,9 +7,10 @@ import shlex
 import urlparse
 from supervisor.loggers import getLevelNumByDescription
 
-def process_or_group_name(name):
+def process_or_group_name(name_arr):
     """Ensures that a process or group name is not created with
        characters that break the eventlistener protocol or web UI URLs"""
+    name = name_arr[0] if len(name_arr) == 1 else name_arr[1]
     s = str(name).strip()
     if ' ' in s or ':' in s or '/' in s:
         raise ValueError("Invalid name: " + repr(name))
@@ -431,3 +432,26 @@ def profile_options(value):
         else:
             callers = True
     return sort_options, callers
+
+DEBUG_LEVEL = {
+    'trace' : 5,
+    'debug' : 4,
+    'info'  : 3,
+    'warn'  : 2,
+    'error' : 1,
+    'fatal' : 0
+    }
+
+def debug_level(value):
+    value = str(value.lower())
+    try:
+        num = int(value)
+    except (ValueError, TypeError):
+        if not DEBUG_LEVEL.has_key(value):
+            raise ValueError("invalid 'DEBUG_LEVEL' value %s" % value)
+        num = DEBUG_LEVEL[value]
+        
+    if num > 5 or num < 0:
+        raise ValueError("invalid 'DEBUG_LEVEL' value %d" % num)
+
+    return num

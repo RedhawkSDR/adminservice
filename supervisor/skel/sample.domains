@@ -1,0 +1,60 @@
+[domain:domain1]
+command=dom/mgr/DomainManager           ; required relative path to the domain manager - combined with SDRROOT
+DOMAIN_NAME=                            ; required name of your domain - no default
+DMD_FILE=/domain/DomainManager.dmd.xml  ; required relative path to the DMD file
+
+FORCE_REBIND=0   ; optional 1 - force rebind Domain in NamingService, 0 - do not rebind
+PERSISTENCE= 0   ; optional 1 to turn on, 0 for off
+DB_URL=          ; optional path to where the db file gets saved
+ORB_ENDPOINT=    ; optional Sets the endpoint for the DomainManager servant
+ORB_INITREF=     ; optional -ORBInitRef to pass to the process
+USELOGCFG=       ; optional 1 to enable use of libossielog.so to resolve LOGGING_CONFIG_URI
+BINDAPPS=        ; optional Application binding: 0 - Bind to NamingService , 1 - Bind using Domain
+DEBUG_LEVEL=INFO ; optional 5=TRACE,4=DEBUG,3=INFO,2=WARN,1=ERROR,0=FATAL numbers or name
+
+LOGGING_CONFIG_URI=/etc/redhawk/logging/default.logging.properties ; optional path to log configuration file
+
+SDRROOT=%(ENV_SDRROOT)s           ; optional if blank uses $SDRROOT, fallback /var/redhawk/sdr
+OSSIEHOME=%(ENV_OSSIEHOME)s       ; optional if blank uses $OSSIEHOME, fallback /usr/local/redhawk
+LD_LIBRARY_PATH=                  ; optional set up LD_LIBRARY_PATH before execution
+PYTHONPATH=                       ; optional set up PYTHONPATH before execution
+ORB_CFG=                          ; optional path to omniORB configuration file
+
+ENABLE=1                                     ; optional  0/1 enable or disable this domain
+conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customizeable override enable method
+
+PERMISSIONS_START_ONLY=1       ; optional - only set user and group when you run the executable, not for the pre/post scripts
+
+logfile_directory=             ; optional logging path; default /var/log/redhawk/domain-mgr/<domain_name>.log
+stderr_logfile=                ; optional stderr log file name; default AUTO
+stdout_logfile=                ; optional stdout log file name; default AUTO
+redirect_stderr=true           ; optional redirect proc stderr to stdout
+
+directory=%(ENV_SDRROOT)s      ; optional directory to cwd to before running scripts and services
+;umask=022                     ; optional umask for process (default None)
+priority=100                   ; optional the relative start priority (default 999)
+autostart=false                ; optional start at supervisord start (default: true)
+startsecs=10                   ; optional # of secs prog must stay up to be running (def. 1)
+startretries=0                 ; optional max # of serial start failures when starting (default 3)
+autorestart=False              ; optional when to restart if exited after running (def: False)
+;exitcodes=0,2                 ; optional 'expected' exit codes used with autorestart (default 0,2)
+stopsignal=TERM                ; optional signal used to kill process (default TERM)
+;stopwaitsecs=10               ; optional max num secs to wait b4 SIGKILL (default 10)
+;stopasgroup=false             ; optional send stop signal to the UNIX process group (default false)
+;killasgroup=false             ; optional SIGKILL the UNIX process group (def false)
+;environment=ORB_CFG="/etc/omniORB.cfg",B="       ; optional process environment additions (def no adds)
+;serverurl=AUTO                ; optional override serverurl computation (childutils)
+
+;user=redhawk                  ; optional setuid to this UNIX account to run the program
+;group=redhawk                 ; optional setgid to this UNIX group to run the program
+
+;nicelevel=                    ; optional cmd line args to pass to nice when running process
+;affinity=                     ; optional cmd line args to pass to numaclt when running process
+;ulimit=                       ; optional cmd line args to pass to ulimit before running process
+;corefiles=0                   ; optional 1 enable core files, 0 use ulimit settings
+
+;start_pre_script=             ; optional script to run before starting the process
+;start_post_script=            ; optional script to run after starting the process
+;stop_pre_script=              ; optional script to run before stopping the process
+;stop_post_script=             ; optional script to run after stopping the process
+

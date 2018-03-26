@@ -80,8 +80,11 @@ class POutputDispatcher(PDispatcher):
         self.fd = fd
         self.channel = channel = self.event_type.channel
 
-        logfile = getattr(process.config, '%s_logfile' % channel)
-        capture_maxbytes = getattr(process.config,
+        logfile = None
+        capture_maxbytes = None
+        if not hasattr(process.config, 'logfile') :
+            logfile = getattr(process.config, '%s_logfile' % channel)
+            capture_maxbytes = getattr(process.config,
                                    '%s_capture_maxbytes' % channel)
 
         if logfile:

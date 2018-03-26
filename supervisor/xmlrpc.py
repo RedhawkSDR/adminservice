@@ -388,7 +388,7 @@ class supervisor_xmlrpc_handler(xmlrpc_handler):
                 params = ()
 
             try:
-                logger.trace('XML-RPC method called: %s()' % method)
+                logger.info('XML-RPC method called: %s()' % method)
                 value = self.call(method, params)
                 logger.trace('XML-RPC method %s() returned successfully' %
                              method)

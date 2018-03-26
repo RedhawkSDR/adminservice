@@ -4,6 +4,7 @@ import datetime
 import errno
 import types
 
+from supervisor.datatypes import boolean
 from supervisor.datatypes import signal_number
 
 from supervisor.options import readFile
@@ -265,7 +266,7 @@ class SupervisorNamespaceRPCInterface:
 
         return group, process
 
-    def startProcess(self, name, wait=True):
+    def startProcess(self, name, force, wait=True):
         """ Start a process
 
         @param string name Process name (or ``group:name``, or ``group:*``)
@@ -277,7 +278,9 @@ class SupervisorNamespaceRPCInterface:
         group, process = self._getGroupAndProcess(name)
         if process is None:
             group_name, process_name = split_namespec(name)
-            return self.startProcessGroup(group_name, wait)
+            return self.startProcessGroup(group_name, force, wait)
+        elif not boolean(force) and not process.config.ENABLE:
+            return False
 
         # test filespec, don't bother trying to spawn if we know it will
         # eventually fail
@@ -339,7 +342,7 @@ class SupervisorNamespaceRPCInterface:
 
         return True
 
-    def startProcessGroup(self, name, wait=True):
+    def startProcessGroup(self, name, force, wait=True):
         """ Start all processes in the group named 'name'
 
         @param string name     The group name
@@ -353,12 +356,13 @@ class SupervisorNamespaceRPCInterface:
         if group is None:
             raise RPCError(Faults.BAD_NAME, name)
 
+        force = boolean(force) if force is not None else False
         processes = group.processes.values()
         processes.sort()
-        processes = [ (group, process) for process in processes ]
+        processes = [ (group, process) for process in processes if force or process.config.ENABLE]
 
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
-                                wait=wait)
+                                force=str(force), wait=wait)
 
         startall.delay = 0.05
         startall.rpcinterface = self
@@ -374,7 +378,7 @@ class SupervisorNamespaceRPCInterface:
 
         processes = self._getAllProcesses()
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
-                                wait=wait)
+                                False, wait=wait)
 
         startall.delay = 0.05
         startall.rpcinterface = self
