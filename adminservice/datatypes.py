@@ -53,6 +53,12 @@ def list_of_ints(arg):
             raise ValueError("not a valid list of ints: " + repr(arg))
 
 def list_of_exitcodes(arg):
+    if not arg:
+        return []
+
+    # If this is a string form of the array, strip the [] and validate the contents
+    if arg[0] == '[' and arg[len(arg) - 1] == ']':
+        arg = arg[1:len(arg) - 1]
     try:
         vals = list_of_ints(arg)
         for val in vals:

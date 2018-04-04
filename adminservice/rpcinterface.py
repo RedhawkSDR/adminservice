@@ -31,6 +31,7 @@ from adminservice.states import getAdminServiceStateDescription
 from adminservice.states import ProcessStates
 from adminservice.states import getProcessStateDescription
 from adminservice.states import (
+    ALL_STOPPED_STATES,
     RUNNING_STATES,
     STOPPED_STATES,
     )
@@ -150,6 +151,7 @@ class AdminServiceNamespaceRPCInterface:
         """
         self._update('shutdown')
         self.adminserviced.options.mood = AdminServiceStates.SHUTDOWN
+        self.adminserviced.options.logger.debug("Server mood is now %d" % self.adminserviced.options.mood)
         return True
 
     def restart(self):
@@ -270,6 +272,7 @@ class AdminServiceNamespaceRPCInterface:
         """ Start a process
 
         @param string name Process name (or ``group:name``, or ``group:*``)
+        @param string force Force the process to try start if its config is disabled
         @param boolean wait Wait for process to be fully started
         @return boolean result     Always true unless error
 
@@ -279,8 +282,13 @@ class AdminServiceNamespaceRPCInterface:
         if process is None:
             group_name, process_name = split_namespec(name)
             return self.startProcessGroup(group_name, force, wait)
-        elif not boolean(force) and not process.config.ENABLE:
+        elif not boolean(force) and not process.config.is_enabled():
             return False
+
+        if process.get_state() in RUNNING_STATES:
+            raise RPCError(Faults.ALREADY_STARTED, name)
+        elif boolean(force) and process.get_state() == ProcessStates.DISABLED:
+            process.change_state(ProcessStates.STOPPED)
 
         # test filespec, don't bother trying to spawn if we know it will
         # eventually fail
@@ -290,9 +298,6 @@ class AdminServiceNamespaceRPCInterface:
             raise RPCError(Faults.NO_FILE, why.args[0])
         except (NotExecutable, NoPermission), why:
             raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
-
-        if process.get_state() in RUNNING_STATES:
-            raise RPCError(Faults.ALREADY_STARTED, name)
 
         process.spawn()
 
@@ -359,9 +364,9 @@ class AdminServiceNamespaceRPCInterface:
         force = boolean(force) if force is not None else False
         processes = group.processes.values()
         processes.sort()
-        processes = [ (group, process) for process in processes if force or process.config.ENABLE]
+        processes = [ (group, process) for process in processes]
 
-        startall = make_allfunc(processes, isNotRunning, self.startProcess,
+        startall = make_startallfunc(processes, isNotRunning, self.startProcess,
                                 force=str(force), wait=wait)
 
         startall.delay = 0.05
@@ -418,14 +423,14 @@ class AdminServiceNamespaceRPCInterface:
 
         self.adminserviced.reap()
 
-        if wait and process.get_state() not in STOPPED_STATES:
+        if wait and process.get_state() not in ALL_STOPPED_STATES:
 
             def onwait():
                 # process will eventually enter a stopped state by
                 # virtue of the adminserviced.reap() method being called
                 # during normal operations
                 process.stop_report()
-                if process.get_state() not in STOPPED_STATES:
+                if process.get_state() not in ALL_STOPPED_STATES:
                     return NOT_DONE_YET
                 return True
 
@@ -451,6 +456,7 @@ class AdminServiceNamespaceRPCInterface:
 
         processes = group.processes.values()
         processes.sort()
+        processes.reverse()
         processes = [ (group, process) for process in processes ]
 
         killall = make_allfunc(processes, isRunning, self.stopProcess,
@@ -562,6 +568,7 @@ class AdminServiceNamespaceRPCInterface:
                       'group': gconfig.name,
                       'inuse': inuse,
                       'autostart': pconfig.autostart,
+                      'enabled': pconfig.is_enabled(),
                       'group_prio': gconfig.priority,
                       'process_prio': pconfig.priority })
 
@@ -586,7 +593,7 @@ class AdminServiceNamespaceRPCInterface:
             if not desc:
                 desc = 'unknown error (try "tail %s")' % info['name']
 
-        elif state in (ProcessStates.STOPPED, ProcessStates.EXITED):
+        elif state in (ProcessStates.DISABLED, ProcessStates.STOPPED, ProcessStates.EXITED):
             if info['start']:
                 stop = info['stop']
                 stop_dt = datetime.datetime(*time.localtime(stop)[:7])
@@ -985,9 +992,145 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
     # the setting of ignore flags to signals.
     return allfunc
 
+def make_startallfunc(processes, predicate, func, **extra_kwargs):
+    """ Return a closure representing a function that calls a
+    function for every process, and returns a result """
+
+    callbacks = []
+    results = []
+
+    def startallfunc(
+        processes=processes,
+        predicate=predicate,
+        func=func,
+        extra_kwargs=extra_kwargs,
+        callbacks=callbacks, # used only to fool scoping, never passed by caller
+        results=results, # used only to fool scoping, never passed by caller
+        ):
+
+        if not callbacks:
+            force = boolean(extra_kwargs['force'])
+            last_state = None
+            for group, process in processes:
+                timed_out = False
+                name = make_namespec(group.config.name, process.config.name)
+                if predicate(process):
+                    if not force and not process.config.is_enabled():
+                        results.append({'name':process.config.name,
+                                        'group':group.config.name,
+                                        'status':Faults.DISABLED,
+                                        'description':'%s is disabled' % (process.config.name)})
+                        continue
+
+                    # Remove the pid file, use its existence to check if the process has started
+                    if os.path.exists(process.config.pid_file) and not process.config.check_status():
+                        print "Removing %s in make_startallfunc" % process.config.pid_file
+                        os.remove(process.config.pid_file)
+    
+                    try:
+                        if last_state is not None:
+                            timed_out = wait_transition(last_state[0], last_state[1], process)
+                        if timed_out:
+                            results.append({'name':process.config.name,
+                                            'group':group.config.name,
+                                            'status':Faults.FAILED,
+                                            'description':'Timed out waiting for previous %s to start' % (last_state[1].config.name)})
+                            continue
+                        if process.state == ProcessStates.DISABLED:
+                            process.change_state(ProcessStates.STOPPED)
+                        callback = func(name, **extra_kwargs)
+
+                        last_state = (process.state, process)
+
+                    except RPCError, e:
+                        results.append({'name':process.config.name,
+                                        'group':group.config.name,
+                                        'status':e.code,
+                                        'description':e.text})
+                        continue
+                    if isinstance(callback, types.FunctionType):
+                        callbacks.append((group, process, callback))
+                    else:
+                        results.append(
+                            {'name':process.config.name,
+                             'group':group.config.name,
+                             'status':Faults.SUCCESS,
+                             'description':'OK'}
+                            )
+
+        if not callbacks:
+            return results
+
+        for struct in callbacks[:]:
+
+            group, process, cb = struct
+
+            try:
+                value = cb()
+            except RPCError, e:
+                results.append(
+                    {'name':process.config.name,
+                     'group':group.config.name,
+                     'status':e.code,
+                     'description':e.text})
+                callbacks.remove(struct)
+            else:
+                if value is not NOT_DONE_YET:
+                    results.append(
+                        {'name':process.config.name,
+                         'group':group.config.name,
+                         'status':Faults.SUCCESS,
+                         'description':'OK'}
+                        )
+                    callbacks.remove(struct)
+
+        if callbacks:
+            return NOT_DONE_YET
+
+        return results
+
+    return startallfunc
+
+def wait_transition(last_state, last_proc, new_proc):
+    new_proc.config.options.logger.trace("RPC - %s - Last state: %s   wait: %r" % (new_proc.config.name, last_state, new_proc.config.waitforprevious))
+    # The only states we want to start from: DISABLED(force was set true in the start proc), STOPPED or EXITED
+    waitable_states = [ProcessStates.DISABLED, ProcessStates.STOPPED, ProcessStates.EXITED, ProcessStates.FATAL, ProcessStates.UNKNOWN]
+    
+    # Check if the new process' config has waiting enabled
+    # - And the last state of the previous process is in STARTING
+    # - And the current state is one we want to start from
+    if new_proc.config.waitforprevious is not None and last_state == ProcessStates.STARTING and new_proc.get_state() in waitable_states:
+        timed_out = new_proc.config.waitforprevious
+
+        # Loop for new_proc.config.waitforprevious seconds, check each second
+        while timed_out > 0:
+            new_proc.config.options.logger.debug("%s is waiting for %s to start" % (new_proc.config.name, last_proc.config.name))
+            time.sleep(1)
+            timed_out -= 1
+
+            if last_proc.get_state() == ProcessStates.STARTING:
+                # "Help" the previous process along its way to the RUNNING state. If we don't
+                # do this, the process won't transition on its own
+                last_proc.transition()
+            elif last_proc.get_state() == ProcessStates.RUNNING:
+                new_proc.config.options.logger.debug("Last process started, going to start %s" % new_proc.config.name)
+                return False
+
+        # Check if the process transitioned to running on the last wait attempt
+        if last_proc.get_state() != ProcessStates.RUNNING:
+            new_proc.config.options.logger.debug("Last process did not start, returning %s for %s" % (new_proc.config.failafterwait, new_proc.config.name))
+            return new_proc.config.failafterwait
+        else:
+            last_state = last_proc.get_state()
+
+    new_proc.config.options.logger.debug("Not waiting anymore-- wait: %s  last_state: %s  new_state: %s" % (new_proc.config.waitforprevious, last_state, new_proc.get_state()))
+    return False
+
 def isRunning(process):
     if process.get_state() in RUNNING_STATES:
         return True
+    else:
+        process.config.options.logger.debug("%s is not running: %s" % (process.config.name, process.get_state()))
 
 def isNotRunning(process):
     return not isRunning(process)

@@ -1,0 +1,35 @@
+[node:default]
+command=dev/mgr/DeviceManager           ; required relative path to the device manager - combined with SDRROOT
+DOMAIN_NAME=                            ; required name of your domain - no default
+SPD=/mgr/DeviceManager.spd.xml          ; required relative path to the DeviceManagers spd file
+DCD_FILE=                               ; optional relative path to the DCD file - uses NODE_NAME for path if blank
+NODE_NAME=                              ; optional if DCD_FILE is blank - name of your node
+SDRCACHE=                               ; optional absolute path for DeviceManager to create cache directory
+
+DEBUG_LEVEL=INFO                        ; optional 5=TRACE,4=DEBUG,3=INFO,2=WARN,1=ERROR,0=FATAL numbers or name
+LOGGING_CONFIG_URI=/etc/redhawk/logging/default.logging.properties ; optional path to logging configuration file
+
+SDRROOT=%(ENV_SDRROOT)s                 ; optional override SDRROOT - if blank uses $SDRROOT
+OSSIEHOME=%(ENV_OSSIEHOME)s             ; optional override OSSIEHOME - if blank uses $OSSIEHOME
+PATH=%(ENV_OSSIEHOME)s/bin:%(ENV_PATH)s ; optional add to the PATH before execution
+
+enable=1                                ; optional 1 to enable or 0 to disable this node
+conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customize the enable string
+
+logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/device-mgr/<domain_name>.<node_name>.log
+redirect_stderr=true              ; optional redirect proc stderr to stdout (default false)
+
+directory=%(ENV_SDRROOT)s         ; optional directory to cwd to before running scripts and services
+priority=400                      ; optional the relative start priority (default 999)
+run_detached=True                 ; optional run this process as a daemon
+autostart=True                    ; optional start at adminserviced start (default: true)
+startsecs=5                       ; optional # of secs prog must stay up to be running (def. 1)
+startretries=0                    ; optional max # of serial start failures when starting (default 3)
+autorestart=False                 ; optional when to restart if exited after running (def: False)
+stopsignal=TERM                   ; optional signal used to kill process (default TERM)
+waitforprevious=45                ; optional wait this many seconds for the previously enabled process in this group to start
+failafterwait=True                ; optional abort starting this group if the wait times out
+
+user=redhawk                      ; optional setuid to this UNIX account to run the program
+group=redhawk                     ; optional setgid to this UNIX group to run the program
+

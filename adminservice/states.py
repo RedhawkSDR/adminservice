@@ -2,6 +2,7 @@
 # circular import problems.
 
 class ProcessStates:
+    DISABLED = -10
     STOPPED = 0
     STARTING = 10
     RUNNING = 20
@@ -10,6 +11,12 @@ class ProcessStates:
     EXITED = 100
     FATAL = 200
     UNKNOWN = 1000
+
+ALL_STOPPED_STATES = (ProcessStates.DISABLED,
+                  ProcessStates.STOPPED,
+                  ProcessStates.EXITED,
+                  ProcessStates.FATAL,
+                  ProcessStates.UNKNOWN)
 
 STOPPED_STATES = (ProcessStates.STOPPED,
                   ProcessStates.EXITED,

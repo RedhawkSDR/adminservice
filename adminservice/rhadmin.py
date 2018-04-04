@@ -30,12 +30,15 @@ import socket
 import urlparse
 import sys
 import threading
+import pkg_resources
+from operator import itemgetter
 
 from adminservice.medusa import asyncore_25 as asyncore
 
+from adminservice.datatypes import boolean
 from adminservice.options import ClientOptions
 from adminservice.options import make_namespec
-from adminservice.options import split_namespec
+from adminservice.options import split_namespec as sn
 from adminservice import xmlrpc
 from adminservice import states
 from adminservice import http_client
@@ -704,6 +707,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return template % (name, 'spawn error')
         elif code == xmlrpc.Faults.ABNORMAL_TERMINATION:
             return template % (name, 'abnormal termination')
+        elif code == xmlrpc.Faults.FAILED:
+            return template % (name, 'failed starting process')
+        elif code == xmlrpc.Faults.DISABLED:
+            return template % (name, 'process is disabled')
         elif code == xmlrpc.Faults.SUCCESS:
             return '%s: started' % name
         # assertion
@@ -1001,6 +1008,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
             formatted['inuse'] = 'in use'
         else:
             formatted['inuse'] = 'avail'
+        if configinfo['enabled']:
+            formatted['enabled'] = 'Enabled' if boolean(configinfo['enabled']) else 'Disabled'
+        else:
+            formatted['enabled'] = 'Disabled'
         if configinfo['autostart']:
             formatted['autostart'] = 'auto'
         else:
@@ -1008,7 +1019,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         formatted['priority'] = "%s:%s" % (configinfo['group_prio'],
                                            configinfo['process_prio'])
 
-        template = '%(name)-32s %(inuse)-9s %(autostart)-9s %(priority)s'
+        template = '%(name)-32s %(inuse)-9s %(autostart)-9s %(enabled)-9s %(priority)s'
         return template % formatted
 
     def do_avail(self, arg):
@@ -1026,6 +1037,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             else:
                 raise
         else:
+            configinfo = sorted(configinfo, key=itemgetter('group', 'name'))
             for pinfo in configinfo:
                 self.ctl.output(self._formatConfigInfo(pinfo))
 
@@ -1317,6 +1329,31 @@ class DefaultControllerPlugin(ControllerPluginBase):
         self.ctl.output('fg <process>\tConnect to a process in foreground mode')
         self.ctl.output("\t\tCtrl-C to exit")
 
+    config_files = {
+        'admin'      : 'skel/sample.admin',
+        'domain'     : 'skel/sample.domains',
+        'node'       : 'skel/sample.nodes',
+        'waveform'   : 'skel/sample.waveforms',
+        'supervisor' : 'skel/sample.conf'
+        }
+
+    def do_config(self, arg):
+        if not self.config_files.has_key(arg):
+            self.ctl.output('Error: incorrect config argument')
+            self.help_config()
+            return
+        config = pkg_resources.resource_string(__name__, self.config_files[arg])
+        self.ctl.output(config)
+
+    def help_config(self):
+        self.ctl.output('config <type>\tOutput a config file for the specified type to the screen')
+        self.ctl.output("\t\t<type> can be one of: admin, domain, node, waveform")
+
+def split_namespec(name):
+    # TODO this isn't right. This will make regular processes not work
+    if name.find(":") != -1:
+        return sn(name)
+    return name, None
 
 def main(args=None, options=None):
     if options is None:

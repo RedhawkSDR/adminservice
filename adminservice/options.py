@@ -17,6 +17,8 @@ import glob
 import platform
 import warnings
 import fcntl
+import subprocess
+import inspect
 
 from adminservice.medusa import asyncore_25 as asyncore
 
@@ -79,6 +81,7 @@ class Options:
     # If you want positional arguments, set this to 1 in your subclass.
     positional_args_allowed = 0
 
+
     def __init__(self, require_configfile=True):
         """Constructor.
 
@@ -97,13 +100,9 @@ class Options:
         self.add(None, None, "h", "help", self.help)
         self.add("configfile", None, "c:", "configuration=")
 
-        here = os.path.dirname(os.path.dirname(sys.argv[0]))
-        searchpaths = [os.path.join(here, 'etc', 'adminserviced.conf'),
-                       os.path.join(here, 'adminserviced.conf'),
-                       'adminserviced.conf',
-                       'etc/adminserviced.conf',
-                       '/etc/adminserviced.conf',
-                       '/etc/adminservice/adminserviced.conf',
+        searchpaths = ['adminserviced.conf',
+                       'etc/redhawk/adminserviced.conf',
+                       '/etc/redhawk/adminserviced.conf',
                        ]
         self.searchpaths = searchpaths
 
@@ -123,6 +122,7 @@ class Options:
                        'use the -c option to specify a config file '
                        'at a different path' % ', '.join(self.searchpaths))
         return config
+    here = os.path.dirname(os.path.dirname(sys.argv[0]))
 
     def help(self, dummy):
         """Print a long help message to stdout and exit(0).
@@ -786,7 +786,7 @@ class ServerOptions(Options):
                 continue
             group_name = process_or_group_name(section.split(':', 1))
             programs = list_of_strings(get(section, 'programs', None))
-            enabled = boolean(get(section, 'ENABLE', 'True'))
+            enabled = boolean(get(section, 'enable', 'True'))
             priority = integer(get(section, 'priority', 999))
             group_processes = []
             for program in programs:
@@ -810,7 +810,7 @@ class ServerOptions(Options):
                 continue
             config_name = process_or_group_name(section.split(':', 1))
             priority = integer(get(section, 'priority', 999))
-            enabled = boolean(get(section, 'ENABLE', 'True'))
+            enabled = boolean(get(section, 'enable', 'True'))
             processes = self.processes_from_section(parser, section, config_name,
                                                     ProcessConfig, False, None)
             groups.append(ProcessGroupConfig(self, config_name, priority, enabled, processes))
@@ -831,7 +831,7 @@ class ServerOptions(Options):
                 default_config = processes[0]
             else:
                 priority = integer(get(section, 'priority', default_config.priority))
-                enabled = boolean(get(section, 'ENABLE', 'True'))
+                enabled = boolean(get(section, 'enable', 'True'))
                 domain_name = processes[0].DOMAIN_NAME
                 if groupMap.has_key(domain_name):
                     groupMap[domain_name].process_configs.extend(processes)
@@ -850,7 +850,7 @@ class ServerOptions(Options):
             # give listeners a "high" default priority so they are started first
             # and stopped last at mainloop exit
             priority = integer(get(section, 'priority', -1))
-            enabled = boolean(get(section, 'ENABLE', 'True'))
+            enabled = boolean(get(section, 'enable', 'True'))
 
             buffer_size = integer(get(section, 'buffer_size', 10))
             if buffer_size < 1:
@@ -903,7 +903,7 @@ class ServerOptions(Options):
                 continue
             program_name = process_or_group_name(section.split(':', 1))
             priority = integer(get(section, 'priority', 999))
-            enabled = boolean(get(section, 'ENABLE', 'True'))
+            enabled = boolean(get(section, 'enable', 'True'))
             fcgi_expansions = {'program_name': program_name}
 
             # find proc_uid from "user" option
@@ -1019,44 +1019,50 @@ class ServerOptions(Options):
             kwargs['expansions'] = expansions
             return parser.saneget(section, opt, *args, **kwargs)
 
-        priority = integer(get(section, 'priority', '999')) if default_klass is None else default_klass.priority
-        autostart = boolean(get(section, 'autostart', 'true')) if default_klass is None else default_klass.autostart
-        autorestart = auto_restart(get(section, 'autorestart', 'False')) if default_klass is None else default_klass.autorestart
-        startsecs = integer(get(section, 'startsecs', 10)) if default_klass is None else default_klass.startsecs
-        startretries = integer(get(section, 'startretries', 3)) if default_klass is None else default_klass.startretries
-        stopsignal = signal_number(get(section, 'stopsignal', 'TERM')) if default_klass is None else default_klass.stopsignal
-        stopwaitsecs = integer(get(section, 'stopwaitsecs', 10)) if default_klass is None else default_klass.stopwaitsecs
-        stopasgroup = boolean(get(section, 'stopasgroup', 'false')) if default_klass is None else default_klass.stopasgroup
-        killasgroup = boolean(get(section, 'killasgroup', stopasgroup)) if default_klass is None else default_klass.killasgroup
-        exitcodes = list_of_exitcodes(get(section, 'exitcodes', '0,2')) if default_klass is None else default_klass.exitcodes
-        conditional_config = get(section, 'conditional_config', None) if default_klass is None else default_klass.conditional_config
+        priority = integer(get(section, 'priority', '999' if default_klass is None else default_klass.priority))
+        autostart = boolean(get(section, 'autostart', 'true' if default_klass is None else str(default_klass.autostart)))
+        autorestart = auto_restart(get(section, 'autorestart', 'False' if default_klass is None else str(default_klass.autorestart)))
+        startsecs = integer(get(section, 'startsecs', 1 if default_klass is None else default_klass.startsecs))
+        startretries = integer(get(section, 'startretries', 3 if default_klass is None else default_klass.startretries))
+        stopsignal = signal_number(get(section, 'stopsignal', 'TERM' if default_klass is None else default_klass.stopsignal))
+        stopwaitsecs = integer(get(section, 'stopwaitsecs', 10 if default_klass is None else default_klass.stopwaitsecs))
+        stopasgroup = boolean(get(section, 'stopasgroup', 'false' if default_klass is None else str(default_klass.stopasgroup)))
+        killasgroup = boolean(get(section, 'killasgroup', str(stopasgroup) if default_klass is None else str(default_klass.killasgroup)))
+        exitcodes = list_of_exitcodes(get(section, 'exitcodes', '0,2' if default_klass is None else str(default_klass.exitcodes)))
+        run_detached = boolean(get(section, 'run_detached', 'false' if default_klass is None else str(default_klass.run_detached)))
+        pid_file = get(section, 'pid_file', None)
+        waitforprevious = integer(get(section, 'waitforprevious', 1 if default_klass is None else default_klass.waitforprevious))
+        failafterwait = boolean(get(section, 'failafterwait', 'false' if default_klass is None else str(default_klass.failafterwait)))
+        conditional_config = get(section, 'conditional_config', None if default_klass is None else default_klass.conditional_config)
         # see also redirect_stderr check in process_groups_from_parser()
-        redirect_stderr = boolean(get(section, 'redirect_stderr', 'false')) if default_klass is None else default_klass.redirect_stderr
+        redirect_stderr = boolean(get(section, 'redirect_stderr', 'false' if default_klass is None else str(default_klass.redirect_stderr)))
         environment_str = get(section, 'environment', '', do_expand=False)
-        logfile_directory = get(section, 'logfile_directory', self.configroot.adminserviced.childlogdir) if default_klass is None else default_klass.logfile_directory
-        stdout_cmaxbytes = byte_size(get(section,'stdout_capture_maxbytes','0')) if default_klass is None else default_klass.stdout_capture_maxbytes
-        stdout_events = boolean(get(section, 'stdout_events_enabled','false')) if default_klass is None else default_klass.stdout_events_enabled
-        stderr_cmaxbytes = byte_size(get(section,'stderr_capture_maxbytes','0')) if default_klass is None else default_klass.stderr_capture_maxbytes
-        stderr_events = boolean(get(section, 'stderr_events_enabled','false')) if default_klass is None else default_klass.stderr_events_enabled
-        start_pre_script = get(section, 'start_pre_script', None) if default_klass is None else default_klass.start_pre_script
-        start_post_script = get(section, 'start_post_script', None) if default_klass is None else default_klass.start_post_script
-        stop_pre_script = get(section, 'stop_pre_script', None) if default_klass is None else default_klass.stop_pre_script
-        stop_post_script = get(section, 'stop_post_script', None) if default_klass is None else default_klass.stop_post_script
-        start_cmd_option = get(section, 'start_cmd_option', None) if default_klass is None else default_klass.start_cmd_option
-        status_cmd_option = get(section, 'status_cmd_option', None) if default_klass is None else default_klass.status_cmd_option
-        stop_cmd_option = get(section, 'stop_cmd_option', None) if default_klass is None else default_klass.stop_cmd_option
-        ulimit = get(section, 'ulimit', None) if default_klass is None else default_klass.ulimit
-        nicelevel = get(section, 'nicelevel', None) if default_klass is None else default_klass.nicelevel
-        affinity = get(section, 'affinity', None) if default_klass is None else default_klass.affinity
-        corefiles = get(section, 'corefiles', None) if default_klass is None else default_klass.corefiles
-        serverurl = get(section, 'serverurl', None) if default_klass is None else default_klass.serverurl
+        logfile_directory = get(section, 'logfile_directory', self.configroot.adminserviced.childlogdir if default_klass is None else default_klass.logfile_directory)
+        stdout_cmaxbytes = byte_size(get(section,'stdout_capture_maxbytes','0'))
+        stdout_events = boolean(get(section, 'stdout_events_enabled','false'))
+        stderr_cmaxbytes = byte_size(get(section,'stderr_capture_maxbytes','0'))
+        stderr_events = boolean(get(section, 'stderr_events_enabled','false'))
+        start_pre_script = get(section, 'start_pre_script', None if default_klass is None else default_klass.start_pre_script)
+        start_post_script = get(section, 'start_post_script', None if default_klass is None else default_klass.start_post_script)
+        started_status_script = get(section, 'started_status_script', None if default_klass is None else default_klass.started_status_script)
+        status_script = get(section, 'status_script', None if default_klass is None else default_klass.status_script)
+        stop_pre_script = get(section, 'stop_pre_script', None if default_klass is None else default_klass.stop_pre_script)
+        stop_post_script = get(section, 'stop_post_script', None if default_klass is None else default_klass.stop_post_script)
+        start_cmd_option = get(section, 'start_cmd_option', None if default_klass is None else default_klass.start_cmd_option)
+        status_cmd_option = get(section, 'status_cmd_option', None if default_klass is None else default_klass.status_cmd_option)
+        stop_cmd_option = get(section, 'stop_cmd_option', None if default_klass is None else default_klass.stop_cmd_option)
+        ulimit = get(section, 'ulimit', None if default_klass is None else default_klass.ulimit)
+        nicelevel = get(section, 'nicelevel', None if default_klass is None else default_klass.nicelevel)
+        affinity = get(section, 'affinity', None if default_klass is None else default_klass.affinity)
+        corefiles = get(section, 'corefiles', None if default_klass is None else default_klass.corefiles)
+        serverurl = get(section, 'serverurl', None if default_klass is None else default_klass.serverurl)
         if serverurl and serverurl.strip().upper() == 'AUTO':
             serverurl = None
 
         # Determine the enable flag - try convert it to a boolean
-        enablement = get(section, 'ENABLE', None)
+        enablement = get(section, 'enable', None)
         if enablement is None:
-            enablement = 'True' if default_klass is None else str(default_klass.ENABLE)
+            enablement = 'True' if default_klass is None else str(default_klass.enable)
         try:
             enabled = boolean(enablement)
             enablement = enabled
@@ -1100,7 +1106,7 @@ class ServerOptions(Options):
         environment = dict_of_key_value_pairs(
             expand(environment_str, expansions, 'environment'))
 
-        directory = get(section, 'directory', None) if default_klass is None else default_klass.directory
+        directory = get(section, 'directory', None if default_klass is None else default_klass.directory)
 
         logfiles = {}
 
@@ -1152,8 +1158,12 @@ class ServerOptions(Options):
             autorestart=autorestart,
             startsecs=startsecs,
             startretries=startretries,
+            waitforprevious=waitforprevious,
+            failafterwait=failafterwait,
             conditional_config=conditional_config,
-            ENABLE=enablement,
+            enable=enablement,
+            run_detached=run_detached,
+            pid_file=pid_file,
             uid=uid,
             gid=gid,
             logfile_directory=logfile_directory,
@@ -1177,6 +1187,8 @@ class ServerOptions(Options):
             serverurl=serverurl,
             start_pre_script=start_pre_script,
             start_post_script=start_post_script,
+            started_status_script=started_status_script,
+            status_script=status_script,
             stop_pre_script=stop_pre_script,
             stop_post_script=stop_post_script,
             start_cmd_option=start_cmd_option,
@@ -1672,9 +1684,9 @@ class ServerOptions(Options):
     def close_fd(self, fd):
         try:
             os.close(fd)
-            #TODO - This is now commented out... remove?
-            #except (OSError,IOError):
-        except OSError:
+        except IOError, e:
+            pass
+        except OSError, e:
             pass
 
     def fork(self):
@@ -1708,6 +1720,7 @@ class ServerOptions(Options):
         return filename
 
     def remove(self, path):
+        self.logger.info("Remove called for %s" % path)
         os.remove(path)
 
     def _exit(self, code):
@@ -2016,25 +2029,27 @@ class ProcessConfig(Config):
         'name', 'uid', 'gid', 'command', 'directory', 'umask', 'priority',
         'autostart', 'autorestart', 'startsecs', 'startretries',
         'stdout_logfile', 'stdout_capture_maxbytes',
-        'stdout_events_enabled',
         'stdout_logfile_backups', 'stdout_logfile_maxbytes',
+        'stdout_events_enabled',
         'stderr_logfile', 'stderr_capture_maxbytes',
         'stderr_logfile_backups', 'stderr_logfile_maxbytes',
         'stderr_events_enabled',
         'stopsignal', 'stopwaitsecs', 'stopasgroup', 'killasgroup',
         'exitcodes', 'redirect_stderr',
-        'ENABLE',
+        'enable', 'run_detached', 'pid_file'
         ]
     optional_param_names = [
-        'environment', 'conditional_config', 'serverurl',
+        'environment', 'conditional_config', 'serverurl', 'waitforprevious', 'failafterwait',
         'nicelevel', 'affinity', 'ulimit', 'corefiles', 'cgroup', 'permissions_start_only',
         'start_pre_script', 'start_post_script', 'stop_pre_script', 'stop_post_script',
+        'started_status_script', 'status_script', 
         'start_cmd_option', 'status_cmd_option', 'stop_cmd_option',
         ]
 
     def __init__(self, options, defaults, **params):
         self.options = options
         self.alive = False
+        self.waits_left = None
         if params is not None:
             for name in self.req_param_names:
                 if not defaults:
@@ -2065,6 +2080,9 @@ class ProcessConfig(Config):
             self.stdout_logfile = get_autoname(name, sid, 'stdout')
         if self.stderr_logfile is Automatic:
             self.stderr_logfile = get_autoname(name, sid, 'stderr')
+        if self.run_detached and self.pid_file is None:
+            self.pid_file = os.path.join(self.options.childpiddir, "%s.%s.pid" % (self.name, self.sid))
+
 
     def make_process(self, group=None):
         from adminservice.process import Subprocess
@@ -2091,19 +2109,58 @@ class ProcessConfig(Config):
         return dispatchers, p
 
     def is_enabled(self):
-        if self.ENABLE is True or self.ENABLE is False:
-            return self.ENABLE
+        if self.enable is True or self.enable is False:
+            return self.enable
         if self.conditional_config is not None:
-            enablement = readFile(self.conditional_config, 0, 1000)
-            return enablement.strip() == self.ENABLE
-    
+            enablement = readFile(self.conditional_config, 0, 0)
+            return enablement.strip() == self.enable
+
+    def get_pid(self):
+        pid = -1
+        if self.pid_file is not None and os.path.exists(self.pid_file):
+            pid = readFile(self.pid_file, 0, 0).strip()
+            try:
+                pid = integer(pid)
+            except:
+                pass
+        return pid
+
     def get_start_command(self):
         return self.command
 
     def get_stop_command(self):
         return None
 
-    def checkStatus(self):
+    def is_started(self):
+        if self.started_status_script is not None:
+            cmd = "%s %s" % (self.started_status_script, '' if self.pid_file is None else self.pid_file)
+            return os.system(cmd) == 0
+        else:
+            return self.check_status()
+
+    def check_status(self):
+        if self.status_script is not None:
+            cmd = "%s %s" % (self.status_script, '' if self.pid_file is None else self.pid_file)
+            return os.system(cmd) == 0
+
+        try:
+            pid = self.get_pid()
+            if pid is None or pid == -1:
+                self.alive = False
+                return False
+            else:
+                os.kill(integer(pid), 0) # does nothing if pid exists, throws OSError if not
+                self.alive = True
+                return True
+        except OSError:
+            self.alive = False
+        except:
+            (fil, _, line), t,v,_ = asyncore.compact_traceback()
+            self.alive = False
+            error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
+            msg = "couldn't stat pid file %s: %s\n" % (self.pid_file, error)
+            self.options.write(2, msg)
+
         return False
 
 class RedhawkProcessConfig(ProcessConfig):
@@ -2188,6 +2245,9 @@ class RedhawkProcessConfig(ProcessConfig):
         if hasattr(self, 'DEBUG_LEVEL') and self.DEBUG_LEVEL is not None:
             self.DEBUG_LEVEL = debug_level(self.DEBUG_LEVEL)
 
+        if hasattr(self, 'waitforprevious') and self.waitforprevious is not None:
+            self.waitforprevious = integer(self.waitforprevious)
+
         for name in self.env_param_names:
             val = getattr(self, name, None)
             if val is not None:
@@ -2227,10 +2287,10 @@ class RedhawkProcessConfig(ProcessConfig):
     def get_start_command(self, addPid=True):
         cmd = self.command
 
-        if hasattr(self, 'pid_file'):
+        if self.run_detached:
             cgroup = ("cgexec " + self.cgroup) if self.cgroup is not None else ''
             
-            nice = ("/usr/bin/nice " + self.nicelevel) if self.nicelevel is not None else ''
+            nice = ("/bin/nice " + self.nicelevel) if self.nicelevel is not None else ''
     
             ulimit = ''
             if self.ulimit is not None:
@@ -2238,10 +2298,6 @@ class RedhawkProcessConfig(ProcessConfig):
             elif self.corefiles is not None:
                 ulimit = "ulimit -c %s >/dev/null 2>&1;" % self.corefiles
     
-            pre_script = (". %s;" % self.start_pre_script) if self.start_pre_script is not None else ''
-            
-            post_script = (";. %s" % self.start_post_script) if self.start_post_script is not None else ''
-            
             numactl = ("numactl " + self.affinity) if self.affinity is not None else ''
             
             start_cmd_option = self.start_cmd_option if self.start_cmd_option is not None else ''
@@ -2255,36 +2311,16 @@ class RedhawkProcessConfig(ProcessConfig):
             else:
                 redirect = "%s 2>> %s" % (redirect, self.stderr_logfile)
             
+            pre_script = (". %s %s;" % (self.start_pre_script, redirect)) if self.start_pre_script is not None else ''
+            
+            post_script = (";. %s %s" % (self.start_post_script, redirect)) if self.start_post_script is not None else ''
+            
             pid = " echo $! > %s" % self.pid_file if addPid and self.pid_file is not None else ''
             
             cmd = '%s %s /bin/bash -c "%s %s %s %s %s %s & %s %s"' % (cgroup, nice, ulimit, pre_script, numactl, cmd, start_cmd_option, redirect, pid, post_script)
 
-        self.options.logger.trace("Start command is:\n%s" % cmd)
+        self.options.logger.blather("%s start command is:\n%s" % (self.name, cmd))
         return cmd
-    
-    def check_status(self):
-        if self.pid_file is not None and os.path.exists(self.pid_file):
-            try:
-                pid = readFile(self.pid_file, 0, 1000)
-                self.options.logger.blather("got pid for %s: %s" % (self.name, pid))
-                if pid is None:
-                    self.options.logger.warn("Unable to get pid for %s"% self.name)
-                    return False
-                else:
-                    os.kill(integer(pid), 0) # does nothing if pid exists, throws OSError if not
-                    return True
-            except OSError, why:
-                self.alive = False
-                code = errno.errorcode.get(why.args[0], why.args[0])
-                msg = "couldn't stat pid %s: %s\n" % (self.name, code)
-                self.options.logger.warn(msg)
-            except:
-                (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
-                self.alive = False
-                error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
-                msg = "couldn't stat pid file %s: %s\n" % (self.pid_file, error)
-                self.options.logger.warn(msg)
-        return False
 
 class DomainConfig(RedhawkProcessConfig):
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
@@ -2320,7 +2356,7 @@ class DomainConfig(RedhawkProcessConfig):
             if self.DOMAIN_NAME is None or self.DOMAIN_NAME.find(' ') > -1:
                 raise ValueError("Invalid value for %s: '%s'" % ('DOMAIN_NAME', self.DOMAIN_NAME))
             
-            self.pid_file = os.path.join(self.options.childpiddir, 'domain-mgrs', self.DOMAIN_NAME + '.pid')
+            self.pid_file = os.path.join(self.options.childpiddir, 'domain-mgrs', "%s.pid" % self.DOMAIN_NAME)
             self.command = self.make_command()
 
     def create_autochildlogs(self):
@@ -2333,17 +2369,20 @@ class DomainConfig(RedhawkProcessConfig):
             self.stderr_logfile = os.path.join(logdir, "%s.stderr.log" % self.DOMAIN_NAME)
             self.stdout_logfile = os.path.join(logdir, "%s.stdout.log" % self.DOMAIN_NAME)
         self.lock_file = os.path.join(self.options.childlockdir, 'domain-mgrs', "%s.lock" % self.DOMAIN_NAME)
-        self.pid_file = os.path.join(self.options.childpiddir, 'domain-mgrs', "%s.pid" % self.DOMAIN_NAME)
 
 class NodeConfig(RedhawkProcessConfig):
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
-    add_req_param_names.extend([
-        'DCD_FILE', 'NODE_NAME'
-        ])
+
     optional_command_line_param_names = RedhawkProcessConfig.optional_command_line_param_names[:]
     optional_command_line_param_names.extend([
-        'SPD', 'SDRCACHE', 'CLIENT_WAIT_TIME', 'CPU_BLACK_LIST', 
+        'DCD_FILE', 'SPD', 'SDRCACHE', 'CLIENT_WAIT_TIME', 'CPU_BLACK_LIST', 
         ])
+
+    optional_param_names = RedhawkProcessConfig.optional_param_names[:]
+    optional_param_names.extend([
+        'NODE_NAME'
+        ])
+
     env_param_names = RedhawkProcessConfig.env_param_names[:]
     env_param_names.extend(['JAVA_HOME', 'PATH'])
 
@@ -2351,27 +2390,30 @@ class NodeConfig(RedhawkProcessConfig):
     command_line_flags.extend(['NOLOGCFG'])
 
     # Add all the extra parameters as optional in the process
-    optional_param_names = RedhawkProcessConfig.optional_param_names[:]
     optional_param_names.extend(optional_command_line_param_names)
     optional_param_names.extend(RedhawkProcessConfig.process_param_names)
     optional_param_names.extend(env_param_names)
     optional_param_names.extend(command_line_flags)
-    
+
     def setValues(self, config_name, defaults, params):
         RedhawkProcessConfig.setValues(self, config_name, defaults, params)
         if not defaults:
             if getattr(self, 'SDRROOT', None) is None:
                 self.SDRROOT = self.options.environ_expansions['ENV_SDRROOT']
+            if getattr(self, 'OSSIEHOME', None) is None:
+                self.OSSIEHOME = self.options.environ_expansions['ENV_OSSIEHOME']
             
-            if self.NODE_NAME is None or self.NODE_NAME.find(' ') > -1:
-                raise ValueError("Invalid value for %s: '%s'" % ('NODE_NAME', self.NODE_NAME))
-            
+            if (self.NODE_NAME is None or self.NODE_NAME.find(' ') > -1) and self.DCD_FILE is None:
+                raise ValueError("Cannot figure out what the DCD file should be")
+            elif self.DCD_FILE is None:
+                self.DCD_FILE = "/nodes/%s/DeviceManager.dcd.xml" % self.NODE_NAME
+
+            self.pid_file = os.path.join(self.options.childpiddir, 'device-mgrs', "%s.%s.pid" % (self.DOMAIN_NAME, self.name))
             self.command = self.make_command()
 
     def create_autochildlogs(self):
         RedhawkProcessConfig.create_autochildlogs(self)
         self.lock_file = os.path.join(self.options.childlockdir, 'device-mgrs', "%s.%s.lock" % (self.DOMAIN_NAME, self.name))
-        self.pid_file = os.path.join(self.options.childpiddir, 'device-mgrs', "%s.%s.pid" % (self.DOMAIN_NAME, self.name))
 
 class WaveformConfig(RedhawkProcessConfig):
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
@@ -2386,10 +2428,6 @@ class WaveformConfig(RedhawkProcessConfig):
     optional_param_names.extend(RedhawkProcessConfig.process_param_names)
     optional_param_names.extend(RedhawkProcessConfig.env_param_names)
     optional_param_names.extend(RedhawkProcessConfig.command_line_flags)
-    
-    start_cmd_option = "-o create"
-    status_cmd_option = "-o status"
-    stop_cmd_option = "-o remove"
 
     def setValues(self, config_name, defaults, params):
         RedhawkProcessConfig.setValues(self, config_name, defaults, params)
@@ -2402,11 +2440,11 @@ class WaveformConfig(RedhawkProcessConfig):
                 wave_name += "." + self.WAVEFORM_NAME
             self.lock_file = os.path.join(self.options.childlockdir, 'waveforms', "%s.%s.lock" % (self.DOMAIN_NAME, wave_name))
             self.pid_file = os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name))
-            
+
             self.command = self.command + " -d " + self.DOMAIN_NAME
             self.command = self.command + " -w " + self.WAVEFORM_INSTANCE_ID
             self.command = self.command + " -i " + self.pid_file
-            
+
             if self.WAVEFORM_NAME is not None:
                 self.command = self.command + " -n " + self.WAVEFORM_NAME
             if self.WAVEFORM_URI is not None:
@@ -2418,16 +2456,20 @@ class WaveformConfig(RedhawkProcessConfig):
 
     def get_start_command(self, addPid=True):
         return RedhawkProcessConfig.get_start_command(self, False)
-        
+
     def get_stop_command(self):
-        remove_command = readFile(self.pid_file, 0, 1000).strip()
-        return remove_command + " -o remove"
-        
+        remove_command = readFile(self.pid_file, 0, 0).strip()
+        return "%s %s" % (remove_command, self.stop_cmd_option)
+
     def check_status(self):
-        status_command = readFile(self.pid_file, 0, 1000).strip()
-        val = os.system("%s --quiet %s" % (status_command, WaveformConfig.status_cmd_option))
-        self.options.logger.blather("Return from command '%s %s': %s" % (status_command, WaveformConfig.status_cmd_option, val))
-        return val == 0
+        if self.status_script is not None:
+            cmd = "%s %s" % (self.status_script, self.pid_file)
+            return os.system(cmd) == 0
+
+        if self.pid_file is not None and os.path.exists(self.pid_file):
+            status_command = readFile(self.pid_file, 0, 0).strip()
+            return os.system("%s --quiet %s" % (status_command, self.status_cmd_option)) == 0
+        return False
 
 class EventListenerConfig(ProcessConfig):
     req_param_names = ProcessConfig.req_param_names[:]
@@ -2479,7 +2521,7 @@ class ProcessGroupConfig(Config):
         self.options = options
         self.name = name
         self.priority = priority
-        self.ENABLE = enabled
+        self.enable = enabled
         self.process_configs = process_configs
 
     def __eq__(self, other):
@@ -2509,7 +2551,7 @@ class EventListenerPoolConfig(Config):
         self.options = options
         self.name = name
         self.priority = priority
-        self.ENABLE = enabled
+        self.enable = enabled
         self.process_configs = process_configs
         self.buffer_size = buffer_size
         self.pool_events = pool_events

@@ -123,6 +123,9 @@ class ProcessStateEvent(Event):
     def get_extra_values(self):
         return []
 
+class ProcessStateDisabledEvent(ProcessStateEvent):
+    pass
+
 class ProcessStateFatalEvent(ProcessStateEvent):
     pass
 
@@ -190,6 +193,7 @@ TICK_EVENTS = [ Tick5Event, Tick60Event, Tick3600Event ] # imported elsewhere
 class EventTypes:
     EVENT = Event # abstract
     PROCESS_STATE = ProcessStateEvent # abstract
+    PROCESS_STATE_DISABLED = ProcessStateDisabledEvent
     PROCESS_STATE_STOPPED = ProcessStateStoppedEvent
     PROCESS_STATE_EXITED = ProcessStateExitedEvent
     PROCESS_STATE_STARTING = ProcessStateStartingEvent

@@ -7,39 +7,41 @@ WAVEFORM_URI=                                  ; required URI to the waveforms .
 
 WAVEFORM_NAME=                                 ; optional name of the launched waveform
 
-ENABLE=1                          ; optional 1 to enable or 0 to disable this domain
-conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customize the enable string
-
-SDRROOT=%(ENV_SDRROOT)s           ; optional override SDRROOT - if blank uses $SDRROOT, fallback /var/redhawk/sdr
-OSSIEHOME=%(ENV_OSSIEHOME)s       ; optional override OSSIEHOME - if blank uses $OSSIEHOME, fallback /usr/local/redhawk
+SDRROOT=%(ENV_SDRROOT)s                        ; optional override SDRROOT - if blank uses $SDRROOT, fallback /var/redhawk/sdr
+OSSIEHOME=%(ENV_OSSIEHOME)s                    ; optional override OSSIEHOME - if blank uses $OSSIEHOME, fallback /usr/local/redhawk
 PYTHONPATH=%(ENV_OSSIEHOME)s/lib/python:%(ENV_PYTHONPATH)s ; optional set up PYTHONPATH before execution
 
-logfile_directory=                ; optional logging path - defaults to /var/log/redhawk/waveforms/<domain_name>.<WAVEFORM_INSTANCE_ID>.log
+enable=1                                       ; optional 1 to enable or 0 to disable this waveform
+conditional_config=/etc/redhawk/rh.cond.cfg    ; optional configuration file passed to customize the enable string
+;environment=ORB_CFG="/etc/omniORB.cfg",B="    ; optional process environment additions (def no adds)
+
+logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/waveforms/<domain_name>.<WAVEFORM_INSTANCE_ID>.log
 stderr_logfile=                   ; optional stderr log file name; default AUTO
 stdout_logfile=                   ; optional stdout log file name; default AUTO
 redirect_stderr=true              ; optional redirect proc stderr to stdout (default false)
 
 
-directory=%(ENV_SDRROOT)s         ; optional directory to cwd to before running scripts and services
-;umask=022                        ; optional umask for process (default None)
+directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts
 priority=400                      ; optional the relative start priority (default 999)
-autostart=false                   ; optional start at supervisord start (default: true)
-startsecs=10                      ; optional # of secs prog must stay up to be running (def. 1)
-startretries=0                    ; optional max # of serial start failures when starting (default 3)
+run_detached=True                 ; optional run this process as a daemon
+autostart=false                   ; optional start at adminserviced start (default: true)
+startsecs=10                      ; optional number of secs prog must stay up to be running (def. 1)
+startretries=0                    ; optional max number of serial start failures when starting (default 3)
 autorestart=False                 ; optional when to restart if exited after running (def: False)
 ;exitcodes=0,2                    ; optional 'expected' exit codes used with autorestart (default 0,2)
 stopsignal=TERM                   ; optional signal used to kill process (default TERM)
 ;stopwaitsecs=10                  ; optional max num secs to wait b4 SIGKILL (default 10)
 ;stopasgroup=false                ; optional send stop signal to the UNIX process group (default false)
 ;killasgroup=false                ; optional SIGKILL the UNIX process group (def false)
-;environment=ORB_CFG="/etc/omniORB.cfg",B="       ; optional process environment additions (def no adds)
-;serverurl=AUTO                   ; optional override serverurl computation (childutils)
+;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
+;failafterwait=False              ; optional abort starting this group if the wait times out
 
 ;user=redhawk                     ; optional setuid to this UNIX account to run the program
 ;group=redhawk                    ; optional setgid to this UNIX group to run the program
+;umask=022                        ; optional umask for process (default None)
 
 ;nicelevel=                       ; optional cmd line args to pass to nice when running process
-;affinity=                        ; optional cmd line args to pass to numaclt when running process
+;affinity=                        ; optional cmd line args to pass to numactl when running process
 ;ulimit=                          ; optional cmd line args to pass to ulimit before running process
 ;corefiles=0                      ; optional 1 enable core files, 0 use ulimit settings
 
@@ -47,6 +49,8 @@ stopsignal=TERM                   ; optional signal used to kill process (defaul
 ;start_post_script=               ; optional script to run after starting the process
 ;stop_pre_script=                 ; optional script to run before stopping the process
 ;stop_post_script=                ; optional script to run after stopping the process
+;status_script=                   ; optional script to run to check status of the process
+;started_status_script=           ; optional script to run to check if the process has started
 
 start_delay=30                    ; optional total time to try restarting waveform before declaring failure
 start_cmd_option=-o create        ; optional extra arguments required to make a valid start command

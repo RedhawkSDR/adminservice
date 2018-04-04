@@ -1,0 +1,5 @@
+#!/bin/sh
+source /etc/profile.d/redhawk.sh
+source /etc/profile.d/redhawk-sdrroot.sh
+
+/usr/local/redhawk/core/bin/adminserviced $*

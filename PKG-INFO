@@ -1,0 +1,10 @@
+Metadata-Version: 1.1
+Name: adminservice
+Version: 2.1.3
+Summary: A system for controlling REDHAWK process state under UNIX. This is based on Supervisor(http://supervisord.org)
+Home-page: UNKNOWN
+Author: UNKNOWN
+Author-email: UNKNOWN
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN

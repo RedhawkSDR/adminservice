@@ -1,0 +1,177 @@
+#!/bin/bash
+# chkconfig: 2345 90 10
+# description: Starts and stops the REDHAWK Admin Service
+# processname: AdminService
+# pidfile: /var/run/redhawk/adminservice.pid
+### BEGIN INIT INFO
+# Provides:         redhawk-adminservice
+# Required-Start:    
+# Required-Stop:     
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: redhawk-adminservice
+# Description:       redhawk-adminservice 
+### END INIT INFO
+
+. /etc/profile.d/redhawk.sh
+if [ -e /etc/profile.d/redhawk-sdrroot.sh ]; then
+	. /etc/profile.d/redhawk-sdrroot.sh
+fi
+
+# Source redhawk function library remap for other os
+import_os_functions () {
+if [ -f /etc/redhat-release ];
+then
+    if [ -f /etc/init.d/functions  ];
+    then 
+        . /etc/init.d/functions        
+        _rh_failure="failure"
+        _rh_success="success"
+    fi
+fi
+if [ -f /etc/lsb-release ];
+then
+   . /lib/lsb/init-functions
+   _rh_failure="log_failure_msg"
+   _rh_success="log_success_msg"
+fi
+}
+
+rh_success() {
+  $_rh_success
+  echo ""
+}
+
+rh_failure() {
+  $_rh_failure
+  echo ""
+}
+
+rh_return() {
+    local retval_=$1
+    local cnt_=$2
+            
+    if [[ $cnt_ < 2 ]]
+    then
+        [ $retval_ -eq 0 ] && rh_success || rh_failure
+        return $1
+    else
+        return 0
+    fi
+}
+
+import_os_functions
+
+#
+# Base service info
+#
+SVC_NAME="REDHAWK Admin Service"
+PID_FILE=/var/run/redhawk/adminserviced.pid
+
+#
+# Service State Functions
+#
+start() {
+    echo "Starting ${SVC_NAME}"
+
+    /usr/local/redhawk/core/bin/adminserviced -c /etc/redhawk/adminserviced.conf
+    retval=$?
+    sleep 3
+    if [ $retval == 0 ]; then
+	    local pid=-1
+	    if [ -e ${PID_FILE} ]; then
+	    	pid=`cat ${PID_FILE}`
+	    fi
+	   
+    	ls /proc/${pid} > /dev/null 2>&1
+    	retval=$?
+    	rh_success
+    else
+    	rh_failure
+    fi
+
+    return $retval
+}
+
+stop() {
+    echo "Stopping ${SVC_NAME}"
+    retval=0
+	if [[ -e ${PID_FILE} && -e "/proc/`cat ${PID_FILE}`" ]]
+	then
+		/usr/local/redhawk/core/bin/rhadmin shutdown > /dev/null 2>&1
+		sleep 5
+		
+		# Check if the pid file still exists.  If it does, force kill.
+		if [[ -e ${PID_FILE} && -e "/proc/`cat ${PID_FILE}`" ]]
+		then
+	        pid=`cat ${PID_FILE}`
+	        killproc -p "${PID_FILE}" 
+	        if [[ $? == 0 ]]
+	        then
+    	    	rh_success
+	        else
+	            retval=1
+    	    	rh_failure
+        	fi
+        else
+	    	rh_success
+        fi
+	fi
+
+    return $retval
+}
+
+restart() {
+    echo "Restarting ${SVC_NAME}"
+
+    # stop the running service
+    stop
+
+    # start the service
+    start
+}
+
+status() {
+    echo -n "Status ${SVC_NAME}"
+
+    local retval=0
+
+	if [[ -e ${PID_FILE} && -e "/proc/`cat ${PID_FILE}`" ]]
+	then
+	    pid=`cat ${PID_FILE}`
+	    echo $" is running"
+	else
+	    echo $" is stopped"
+	    [ -f ${PID_FILE} ] && rm -f "${PID_FILE}"
+	    retval=1
+	fi
+
+    return $retval
+}
+
+
+#
+# Check if user has sufficient privledges
+#
+[[ $UID -ne 0 ]] && echo "User has insufficient privilege." && exit 4
+
+case "$1" in
+	
+	start)
+		start 
+		;;
+	stop)
+		stop 
+		;;
+	restart)
+		restart 
+		;;
+	status)
+		status
+		;;
+	*)
+		echo $"Usage: $0 {start|stop|restart|status}"
+		exit 1
+esac
+
+exit $?

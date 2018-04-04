@@ -1,56 +1,56 @@
 [node:node1]
 command=dev/mgr/DeviceManager           ; required relative path to the device manager - combined with SDRROOT
 DOMAIN_NAME=                            ; required name of your domain - no default
-NODE_NAME=                              ; required name of your node - no default
-DCD_FILE=/domain/DomainManager.dmd.xml  ; required relative path to the DCD file
 SPD=/mgr/DeviceManager.spd.xml          ; required relative path to the DeviceManagers spd file
-SDRCACHE=/data/kavig/tmp                ; optional absolute path for DeviceManager to create cache director
+DCD_FILE=                               ; optional relative path to the DCD file - uses NODE_NAME for path if blank
+NODE_NAME=                              ; optional if DCD_FILE is blank - name of your node
+SDRCACHE=/data/%(ENV_USER)s/tmp         ; optional absolute path for DeviceManager to create cache directory
 CLIENT_WAIT_TIME=                       ; optional amount of time to wait (milliseconds) for completion of client requests
 ORB_ENDPOINT=                           ; optional Sets the endpoint for the DomainManager servant
 ORB_INITREF=                            ; optional pass to ORBInitRef N=V
 USELOGCFG=                              ; optional 1 to enable use of libossielog.so to resolve LOGGING_CONFIG_URI
 
 DEBUG_LEVEL=INFO                        ; optional 5=TRACE,4=DEBUG,3=INFO,2=WARN,1=ERROR,0=FATAL numbers or name
-LOGGING_CONFIG_URI=/etc/redhawk/logging/default.logging.properties ; optional path to log configuration file
+LOGGING_CONFIG_URI=/etc/redhawk/logging/default.logging.properties ; optional path to logging configuration file
 
-SDRROOT=%(ENV_SDRROOT)s           ; optional override SDRROOT - if blank uses $SDRROOT, fallback /var/redhawk/sdr
-OSSIEHOME=%(ENV_OSSIEHOME)s       ; optional override OSSIEHOME - if blank uses $OSSIEHOME, fallback /usr/local/redhawk
-LD_LIBRARY_PATH=                  ; optional set up LD_LIBRARY_PATH before execution
-JAVA_HOME=                        ; optional set up JAVA_HOME before execution
-PATH=%(ENV_OSSIEHOME)s/bin:%(ENV_PATH)s     ; optional add to the PATH before execution
-PYTHONPATH=                       ; optional set up PYTHONPATH before execution
-ORB_CFG=                          ; optional path to omniORB configuration file
+SDRROOT=%(ENV_SDRROOT)s                 ; optional override SDRROOT - if blank uses $SDRROOT
+OSSIEHOME=%(ENV_OSSIEHOME)s             ; optional override OSSIEHOME - if blank uses $OSSIEHOME
+LD_LIBRARY_PATH=                        ; optional set up LD_LIBRARY_PATH before execution
+JAVA_HOME=                              ; optional set up JAVA_HOME before execution
+PATH=%(ENV_OSSIEHOME)s/bin:%(ENV_PATH)s ; optional add to the PATH before execution
+PYTHONPATH=                             ; optional set up PYTHONPATH before execution
+ORB_CFG=                                ; optional path to omniORB configuration file
 
-ENABLE=1                          ; optional 1 to enable or 0 to disable this domain
-conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customize the enable string
+enable=1                                      ; optional 1 to enable or 0 to disable this node
+conditional_config=/etc/redhawk/rh.cond.cfg   ; optional configuration file passed to customize the enable string
+;environment=ORB_CFG="/etc/omniORB.cfg",B=""  ; optional process environment additions (def no adds)
 
-PERMISSIONS_START_ONLY=0          ; optional only set user and group when you run the executable, not for the pre/post scripts
-
-logfile_directory=                ; optional logging path - defaults to /var/log/redhawk/device-mgr/<domain_name>.<node_name>.log
+logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/device-mgr/<domain_name>.<node_name>.log
 stderr_logfile=                   ; optional stderr log file name; default AUTO
 stdout_logfile=                   ; optional stdout log file name; default AUTO
 redirect_stderr=true              ; optional redirect proc stderr to stdout (default false)
 
-directory=%(ENV_SDRROOT)s         ; optional directory to cwd to before running scripts and services
-;umask=022                        ; optional umask for process (default None)
+directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts and services
 priority=400                      ; optional the relative start priority (default 999)
+run_detached=True                 ; optional run this process as a daemon
 autostart=false                   ; optional start at supervisord start (default: true)
 startsecs=10                      ; optional # of secs prog must stay up to be running (def. 1)
 startretries=0                    ; optional max # of serial start failures when starting (default 3)
+stopsignal=TERM                   ; optional signal used to kill process (default TERM)
 autorestart=False                 ; optional when to restart if exited after running (def: False)
 ;exitcodes=0,2                    ; optional 'expected' exit codes used with autorestart (default 0,2)
-stopsignal=TERM                   ; optional signal used to kill process (default TERM)
 ;stopwaitsecs=10                  ; optional max num secs to wait b4 SIGKILL (default 10)
 ;stopasgroup=false                ; optional send stop signal to the UNIX process group (default false)
 ;killasgroup=false                ; optional SIGKILL the UNIX process group (def false)
-;environment=ORB_CFG="/etc/omniORB.cfg",B="       ; optional process environment additions (def no adds)
-;serverurl=AUTO                   ; optional override serverurl computation (childutils)
+;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
+;failafterwait=True               ; optional abort starting this group if the wait times out
 
 ;user=redhawk                     ; optional setuid to this UNIX account to run the program
 ;group=redhawk                    ; optional setgid to this UNIX group to run the program
+;umask=022                        ; optional umask for process (default None)
 
 ;nicelevel=                       ; optional cmd line args to pass to nice when running process
-;affinity=                        ; optional cmd line args to pass to numaclt when running process
+;affinity=                        ; optional cmd line args to pass to numactl when running process
 ;ulimit=                          ; optional cmd line args to pass to ulimit before running process
 ;corefiles=0                      ; optional 1 enable core files, 0 use ulimit settings
 
@@ -58,4 +58,6 @@ stopsignal=TERM                   ; optional signal used to kill process (defaul
 ;start_post_script=               ; optional script to run after starting the process
 ;stop_pre_script=                 ; optional script to run before stopping the process
 ;stop_post_script=                ; optional script to run after stopping the process
+;status_script=                   ; optional script to run to check status of the process
+;started_status_script=           ; optional script to run to check if the process has started
 

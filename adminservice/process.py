@@ -5,14 +5,16 @@ import errno
 import shlex
 import traceback
 import signal
+import subprocess
+import inspect
 from exceptions import Exception
-from subprocess import call
 
 from adminservice.medusa import asyncore_25 as asyncore
 
-from adminservice.states import ProcessStates
+from adminservice.states import ProcessStates, RUNNING_STATES
 from adminservice.states import AdminServiceStates
 from adminservice.states import getProcessStateDescription
+from adminservice.states import ALL_STOPPED_STATES
 from adminservice.states import STOPPED_STATES
 
 from adminservice.options import decode_wait_status
@@ -53,6 +55,7 @@ class Subprocess:
     exitstatus = None # status attached to dead process by finsh()
     spawnerr = None # error message attached by spawn() if any
     group = None # ProcessGroup instance if process is in the group
+    waits_left = None # Number of transition waits left until failing transition
 
     def __init__(self, config):
         """Constructor.
@@ -62,7 +65,7 @@ class Subprocess:
         self.config = config
         self.dispatchers = {}
         self.pipes = {}
-        self.state = ProcessStates.STOPPED
+        self.state = ProcessStates.STOPPED if config.is_enabled() else ProcessStates.DISABLED
 
     def removelogs(self):
         for dispatcher in self.dispatchers.values():
@@ -152,6 +155,7 @@ class Subprocess:
         ProcessStates.BACKOFF: events.ProcessStateBackoffEvent,
         ProcessStates.FATAL:   events.ProcessStateFatalEvent,
         ProcessStates.UNKNOWN: events.ProcessStateUnknownEvent,
+        ProcessStates.DISABLED: events.ProcessStateDisabledEvent,
         ProcessStates.STOPPED: events.ProcessStateStoppedEvent,
         ProcessStates.EXITED:  events.ProcessStateExitedEvent,
         ProcessStates.RUNNING: events.ProcessStateRunningEvent,
@@ -174,6 +178,9 @@ class Subprocess:
             now = time.time()
             self.backoff = self.backoff + 1
             self.delay = now + self.backoff
+
+        elif (new_state == ProcessStates.STOPPED or new_state == ProcessStates.EXITED) and not self.config.is_enabled() and old_state != ProcessStates.DISABLED:
+            new_state = ProcessStates.DISABLED
 
         self.state = new_state
 
@@ -279,14 +286,19 @@ class Subprocess:
             options.dup2(self.pipes['child_stdout'], 2)
         else:
             options.dup2(self.pipes['child_stderr'], 2)
-        # TODO!! these were commented out... should they be here?
         for i in range(3, options.minfds):
             options.close_fd(i)
 
+    def handle_term(self, sig, frame):
+        self.config.options.mood = AdminServiceStates.SHUTDOWN
+
     def _spawn_as_child(self, filename, argv):
         options = self.config.options
-        has_pid = hasattr(self.config, "pid_file")
         exit_code = 127
+
+        # Add a handler to let the detached processes know to stop statusing
+        signal.signal(signal.SIGTERM, self.handle_term)
+
         try:
             # prevent child from receiving signals sent to the
             # parent by calling os.setpgrp to create a new process
@@ -339,20 +351,52 @@ class Subprocess:
                 if self.config.umask is not None:
                     options.setumask(self.config.umask)
                 self.config.alive = True
-                if has_pid:
-                    spawn_val = options.spawnve(os.P_WAIT, argv[0], argv, env)
-                    options.logger.trace("spawnve return for %s: %d" % (self.config.name, spawn_val))
-                    
-                    # Give the process some time to start up
-                    time.sleep(3)
-                    
+                if self.config.run_detached:
+                    # If the process is already running, we don't need to start it again.
+                    if not self.config.check_status():
+
+                        # Remove the pid file, use its existence to check if the process has started
+                        if os.path.exists(self.config.pid_file):
+                            os.remove(self.config.pid_file)
+
+                        # Start the process as a daemon
+                        daemonize(self.config.directory, self.config.umask, argv, env)
+
+                        # Give the process some time to start up
+                        num_checks = 0
+                        while not os.path.exists(self.config.pid_file) and (num_checks < 10):
+                            time.sleep(1)
+                            num_checks += 1
+
+                        # If there's a script to check if the config was started, run it now.
+                        # The assumption is it will return when it can determine if the process
+                        # is in either a good or bad state.
+                        if self.config.started_status_script is not None and not self.config.is_started():
+                            raise "Bad start status for %s" % self.config.name
+
+                    else:
+                        self.change_state(ProcessStates.RUNNING)
+                        msg = "Process for %s was already running. Not going to relaunch\n" % self.config.name
+                        options.write(1, "adminservice: " + msg)
+
                     # Check status every second
-                    while self.config.check_status():
+                    status = self.config.check_status()
+                    while status and self.config.options.mood == AdminServiceStates.RUNNING:
                         exit_code = 0
                         time.sleep(1)
+                        status = self.config.check_status()
+                    
+                    # This is one of the few times that we can remove the pid file.
+                    #    Either the service is shutting down - leave the pid file
+                    #    The process ended/died - remove the pid file
+                    if not status and os.path.exists(self.config.pid_file):
+                        os.remove(self.config.pid_file)
                 else:
                     # This call won't return
                     options.execve(argv[0], argv, env)
+            except SystemExit, e:
+                # The fork called sys.exit, things are ok
+                exit_code = e.code
             except OSError, why:
                 code = errno.errorcode.get(why.args[0], why.args[0])
                 self.config.alive = False
@@ -368,10 +412,10 @@ class Subprocess:
             # this point should only be reached if execve failed or the spawnve'd process is finished.
             # the finally clause will exit the child process.
         except Exception, e:
-            print e
+            options.write(2, "Exception spawning process: %s" % e)
         finally:
             if exit_code != 0:
-                options.write(2, "adminservice: child process was not spawned\n")
+                options.write(2, "adminservice: child process was not spawned (%s)\n" % exit_code)
             options._exit(exit_code) # exit process with code for spawn failure
             
 
@@ -380,12 +424,18 @@ class Subprocess:
         self.administrative_stop = True
         self.laststopreport = 0
 
-        self.run_script(self.config.stop_pre_script)
+        # We want to leave the processes up if they have pid_files and
+        # admin service is shutting down, otherwise run the stop scripts
+        # 
+        shutting_down = (self.config.options.mood < AdminServiceStates.RUNNING)
+        if not shutting_down or not self.config.run_detached:
+            self.run_script(self.config.stop_pre_script)
                     
-        killval = self.kill(self.config.stopsignal)
-        self.config.alive = False
+        killval = self.kill(self.config.stopsignal, shutting_down)
 
-        self.run_script(self.config.stop_post_script)
+        if not shutting_down or not self.config.run_detached:
+            self.config.alive = False
+            self.run_script(self.config.stop_post_script)
 
         return killval
 
@@ -397,9 +447,9 @@ class Subprocess:
             try:
                 for script in pre_files:
                     if os.path.exists(script):
-                        call(["/bin/bash", script])
+                        subprocess.call(["/bin/bash", script])
             except OSError, e:
-                self.config.options.write(2, "adminservice: unable to execute script(s) %s: %s" % (pre_files, repr(e)))
+                self.config.options.write(2, "adminservice: unable to execute script(s) %s: %s\n" % (pre_files, repr(e)))
             except:
                 (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
                 error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
@@ -422,7 +472,7 @@ class Subprocess:
         self._assertInState(ProcessStates.BACKOFF)
         self.change_state(ProcessStates.FATAL)
 
-    def kill(self, sig):
+    def kill(self, sig, shutdown=False):
         """Send a signal to the subprocess.  This may or may not kill it.
 
         Return None if the signal was sent, or an error message string
@@ -433,9 +483,9 @@ class Subprocess:
         detached_pid = None
         stop_command = None
         
-        if hasattr(self.config, "pid_file"):
+        if self.config.run_detached and os.path.exists(self.config.pid_file):
             try:
-                detached_pid = integer(readFile(self.config.pid_file, 0, 1000).strip())
+                detached_pid = integer(self.config.get_pid())
                 options.logger.debug("Found detached pid %s for native pid %s" % (detached_pid, self.pid))
             except Exception, e:
                 stop_command = self.config.get_stop_command()
@@ -494,16 +544,30 @@ class Subprocess:
 
         try:
             if detached_pid is not None:
-                try:
-                    options.kill(detached_pid, sig)
-                except Exception, e:
-                    options.logger.warn("Problem killing detached pid %d: %s" % (detached_pid, e))
+                if shutdown:
+                    options.logger.info("Leaving %s(%d) running, system is shutting down" % (self.config.name, detached_pid))
+                else:
+                    try:
+                        options.kill(detached_pid, sig)
+                        options.logger.warn("Killed detached pid %d" % detached_pid)
+                        if os.path.exists(self.config.pid_file) and not self.config.check_status():
+                            options.logger.trace("Removing %s after killing detached process" % self.config.pid_file)
+                            os.remove(self.config.pid_file)
+                    except Exception, e:
+                        options.logger.warn("Problem killing detached pid %d: %s" % (detached_pid, e))
             if stop_command is not None:
-                try:
-                    val = os.system(stop_command)
-                    options.logger.debug("Stop command for %s had return code of %s" % (pid, val))
-                except Exception, e:
-                    options.logger.warn("Problem running stop command for %s: %s" % (pid, e))
+                if shutdown:
+                    options.logger.info("Leaving %s(%d) running, system is shutting down" % (self.config.name, pid))
+                else:
+                    try:
+                        val = os.system(stop_command)
+                        options.logger.debug("Stop command for %s had return code of %s" % (pid, val))
+                        if os.path.exists(self.config.pid_file) and not self.config.check_status():
+                            options.logger.trace("Removing %s after killing detached process" % self.config.pid_file)
+                            os.remove(self.config.pid_file)
+                    except Exception, e:
+                        options.logger.warn("Problem running stop command for %s: %s" % (pid, e))
+            options.logger.info("Sending %s to pid %s" % (sig, pid))
             options.kill(pid, sig)
         except:
             tb = traceback.format_exc()
@@ -624,6 +688,11 @@ class Subprocess:
 
         self.config.options.logger.info(msg)
 
+        # Clean up the pid file, if present, since we're done with the process at this point
+        if self.config.options.mood == AdminServiceStates.RUNNING and self.config.run_detached and os.path.exists(self.config.pid_file):
+            self.config.options.logger.trace("Finishing process, removing pid file: %s" % self.config.pid_file)
+            os.remove(self.config.pid_file)
+
         self.pid = 0
         self.config.options.close_parent_pipes(self.pipes)
         self.pipes = {}
@@ -675,8 +744,33 @@ class Subprocess:
                             # EXITED -> STARTING
                             self.spawn()
             elif state == ProcessStates.STOPPED and not self.laststart:
+                # Remove the pid file, use its existence to check if the process has started
+                if self.config.run_detached and os.path.exists(self.config.pid_file) and not self.config.check_status():
+                    logger.info("Didn't expect to find the pid file %s, removing now" % self.config.pid_file)
+                    os.remove(self.config.pid_file)
+
                 if self.config.is_enabled() and self.config.autostart:
                     # STOPPED -> STARTING
+                    self.spawn()
+                elif self.config.run_detached:
+                    if os.path.exists(self.config.pid_file) and self.config.check_status():
+                        # If the process has a pid file and is already running, transition to STARTING
+                        # This will handle not starting another process, just need the status thread running
+                        logger.info('%s appears to be running already, changing from %s to STARTING state'
+                                     % (self.config.name, getProcessStateDescription(self.state)))
+                        self.spawn()
+            elif state == ProcessStates.DISABLED and os.path.exists(self.config.pid_file):
+                # If the process is in the disabled state, it may still be running. Check based on the pid_file config value.
+                stat = self.config.check_status()
+                if not stat:
+                    # If the process isn't running but has a pid file, remove it so we don't keep checking
+                    logger.info("Didn't expect to find the pid file %s, removing now" % self.config.pid_file)
+                    os.remove(self.config.pid_file)
+                else:
+                    # If the process has a pid file and is already running, transition to STARTING
+                    # This will handle not starting another process, just need the status thread running
+                    logger.info('%s appears to be running already, changing it to a startable state' % self.config.name)
+                    self.change_state(ProcessStates.STOPPED)
                     self.spawn()
             elif state == ProcessStates.BACKOFF:
                 if self.config.is_enabled() and self.backoff <= self.config.startretries:
@@ -713,10 +807,9 @@ class Subprocess:
                 # kill processes which are taking too long to stop with a final
                 # sigkill.  if this doesn't kill it, the process will be stuck
                 # in the STOPPING state forever.
-                self.config.options.logger.warn(
-                    'killing %r (%s) with SIGKILL' % (self.config.name,
-                                                      self.pid))
-                self.kill(signal.SIGKILL)
+                logger.warn('killing %r (%s) with SIGKILL' % (self.config.name, self.pid))
+                shutting_down = (self.config.options.mood < AdminServiceStates.RUNNING)
+                self.kill(signal.SIGKILL, shutting_down)
 
 class FastCGISubprocess(Subprocess):
     """Extends Subprocess class to handle FastCGI subprocesses"""
@@ -776,7 +869,6 @@ class FastCGISubprocess(Subprocess):
             options.dup2(self.pipes['child_stdout'], 2)
         else:
             options.dup2(self.pipes['child_stderr'], 2)
-        #TODO - these were commented out...should they be here?
         for i in range(3, options.minfds):
             options.close_fd(i)
 
@@ -823,7 +915,7 @@ class ProcessGroupBase:
     def get_unstopped_processes(self):
         """ Processes which aren't in a state that is considered 'stopped' """
         return [ x for x in self.processes.values() if x.get_state() not in
-                 STOPPED_STATES ]
+                 ALL_STOPPED_STATES ]
 
     def get_dispatchers(self):
         dispatchers = {}
@@ -838,11 +930,50 @@ class ProcessGroup(ProcessGroupBase):
     def transition(self):
         procs = self.processes.values()[:]
         procs.sort()
+        last_state = None
+
         for proc in procs:
+            logger = proc.config.options.logger
+
+            # If we're not the first process in the group, check if we need to wait for the previous ones to start
+            if last_state is not None and proc.get_state() in STOPPED_STATES:
+                previous_state = last_state[0]
+
+                if previous_state in RUNNING_STATES and proc.waits_left is None:
+                    proc.waits_left = proc.config.waitforprevious
+
+                # If this process isn't configured to wait, don't bother with these transitions
+                if proc.waits_left is not None and previous_state != ProcessStates.RUNNING:
+                    # Need to wait if we have a wait time set, the previous process is in the STARTING state and
+                    # this process is in the STOPPED state
+                    if proc.waits_left > 0 and previous_state == ProcessStates.STARTING:
+                        logger.trace("%s startup wait conditions true, returning"
+                                     % proc.config.name)
+                        proc.waits_left -= 1
+                        return
+                    # If there are no waits left, or the previous process has transitioned to a new state(not running - a bad state)
+                    # and we haven't started, change the process to the FATAL state and skip this process. Otherwise transition
+                    elif proc.waits_left == 0 or previous_state != ProcessStates.STARTING:
+                        logger.debug("waits = 0 or previous is not starting")
+                        if proc.config.failafterwait and proc.state != ProcessStates.FATAL:
+                            logger.debug("Marking %s as FATAL, waits left: %d  previous state: %s"
+                                         % (proc.config.name, proc.waits_left, getProcessStateDescription(previous_state)))
+                            proc.change_state(ProcessStates.FATAL)
+                            continue
+
+            # If we're not the first process and we're disabled, we still need to spawn a status thread if its running.
+            # Check that the previous state is STARTING, if it is, wait for that to finish before we try to status this process
+            elif last_state is not None and last_state[0] == ProcessStates.STARTING and proc.get_state() == ProcessStates.DISABLED:
+                logger.trace("%s is disabled, previous process is starting. Waiting for previous to transition"
+                             % proc.config.name)
+                return
+
+            proc.waits_left = None
             proc.transition()
+            if proc.get_state() != ProcessStates.DISABLED:
+                last_state = (proc.get_state(), proc)
 
 class FastCGIProcessGroup(ProcessGroup):
-
     def __init__(self, config, **kwargs):
         ProcessGroup.__init__(self, config)
         sockManagerKlass = kwargs.get('socketManager', SocketManager)
@@ -997,3 +1128,45 @@ def new_serial(inst):
         inst.serial = -1
     inst.serial += 1
     return inst.serial
+
+def daemonize(directory, umask, argv, env, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    stdin = os.path.abspath(stdin)
+    stdout = os.path.abspath(stdout)
+    stderr = os.path.abspath(stderr)
+    
+    # Do first fork
+    try: 
+        pid = os.fork() 
+    except OSError as e:
+        sys.stderr.write("fork #1 failed: (%d) %s\n"%(e.errno, e.strerror))
+        sys.exit(1)
+    if pid > 0:
+        return 0 # exit parent
+
+    # Do second fork.
+    try: 
+        pid = os.fork() 
+    except OSError as e: 
+        sys.stderr.write("fork #2 failed: (%d) %s\n"%(e.errno, e.strerror))
+        sys.exit(1)
+    if pid > 0:
+        sys.exit(0) # exit parent
+
+
+    # Decouple from parent environment.
+    os.chdir(directory) 
+    os.umask(integer(umask) if umask is not None else 0) 
+    os.setsid() 
+
+    # Do third fork.
+    try: 
+        pid = os.fork() 
+    except OSError as e: 
+        sys.stderr.write("fork #3 failed: (%d) %s\n"%(e.errno, e.strerror))
+        sys.exit(1)
+    if pid > 0:
+        sys.exit(0) # exit parent
+
+    # Now I am a daemon!
+    subprocess.Popen(argv, env=env, close_fds=True)
+    os._exit(0)
