@@ -37,11 +37,10 @@ Source:         %{name}-%{version}.tar.gz
 Vendor:         REDHAWK
 
 BuildArch:      noarch
-# BuildRoot required for el5
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 
 Requires:       python
 Requires:       redhawk >= 2.0
+Requires(pre):  redhawk >= 2.0
 Requires:       python-meld3
 Requires:       python-tornado
 Requires:       python-zmq
