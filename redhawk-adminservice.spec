@@ -86,16 +86,19 @@ REDHAWK Admin Service
 %install
 rm -rf $RPM_BUILD_ROOT
 %{__python} setup.py install --skip-build -O1 --home=%{_prefix} --root=%{buildroot}
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/domains.d
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/nodes.d
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/waveforms.d
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/lock/redhawk
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/device-mgrs
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/domain-mgrs
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/waveforms
-install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk
+install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/domains.d
+install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d
+install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/nodes.d
+install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/waveforms.d
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/lock/redhawk
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/device-mgrs
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/domain-mgrs
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/waveforms
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/device-mgrs
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/domain-mgrs
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/waveforms
 %{__cp} -r etc $RPM_BUILD_ROOT/
 %{__cp} -r bin/* $RPM_BUILD_ROOT/%{_bindir}
 %if 0%{?with_systemd}
@@ -103,9 +106,9 @@ install -d -m 0775 -g redhawk $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk
 %{__cp} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d/redhawk-adminservice.service $RPM_BUILD_ROOT%{_unitdir}
 %endif
 echo "ENABLED" > $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/rh.cond.cfg
-%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/{domains.d,nodes.d,waveforms.d}
-%{__mkdir_p} $RPM_BUILD_ROOT%{_localstatedir}/{log,lock,run}/redhawk
-%{__mkdir_p} $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/{device-mgrs,domain-mgrs,waveforms}
+#%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/{domains.d,nodes.d,waveforms.d}
+#%{__mkdir_p} $RPM_BUILD_ROOT%{_localstatedir}/{log,lock,run}/redhawk
+#%{__mkdir_p} $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/{device-mgrs,domain-mgrs,waveforms}
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/domains.d/*
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/nodes.d/*
 rm -f $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/waveforms.d/*
@@ -145,12 +148,15 @@ rm -rf $RPM_BUILD_ROOT
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/security/limits.d/99-redhawk-limits.conf
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/sysctl.d
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/sysctl.d/sysctl.conf
-%dir %{_localstatedir}/lock/redhawk
-%dir %{_localstatedir}/log/redhawk
-%dir %{_localstatedir}/log/redhawk/device-mgrs
-%dir %{_localstatedir}/log/redhawk/domain-mgrs
-%dir %{_localstatedir}/log/redhawk/waveforms
-%dir %{_localstatedir}/run/redhawk
+%dir %attr(775,root,redhawk) %{_localstatedir}/lock/redhawk
+%dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk
+%dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/device-mgrs
+%dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/domain-mgrs
+%dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/waveforms
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/device-mgrs
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/domain-mgrs
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/waveforms
 %{_prefix}/lib/python/adminservice
 %if 0%{?rhel} >= 6
 %{_prefix}/lib/python/adminservice-%{version}-py%{python_version}.egg-info
