@@ -224,7 +224,7 @@ class AdminServiceNamespaceRPCInterface:
             raise RPCError(Faults.STILL_RUNNING, name)
         return True
 
-    def _getAllProcesses(self, lexical=False):
+    def _getAllProcesses(self, lexical=False, reverse=False):
         # if lexical is true, return processes sorted in lexical order,
         # otherwise, sort in priority order
         all_processes = []
@@ -236,6 +236,8 @@ class AdminServiceNamespaceRPCInterface:
                 group = self.adminserviced.process_groups[group_name]
                 process_names = group.processes.keys()
                 process_names.sort()
+                if reverse:
+                    process_names.reverse()
                 for process_name in process_names:
                     process = group.processes[process_name]
                     all_processes.append((group, process))
@@ -246,6 +248,8 @@ class AdminServiceNamespaceRPCInterface:
             for group in groups:
                 processes = group.processes.values()
                 processes.sort() # asc by priority
+                if reverse:
+                    processes.reverse()
                 for process in processes:
                     all_processes.append((group, process))
 
@@ -383,7 +387,7 @@ class AdminServiceNamespaceRPCInterface:
 
         processes = self._getAllProcesses()
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
-                                False, wait=wait)
+                                force=False, wait=wait)
 
         startall.delay = 0.05
         startall.rpcinterface = self
@@ -474,7 +478,7 @@ class AdminServiceNamespaceRPCInterface:
         """
         self._update('stopAllProcesses')
 
-        processes = self._getAllProcesses()
+        processes = self._getAllProcesses(reverse=True)
 
         killall = make_allfunc(processes, isRunning, self.stopProcess,
                                wait=wait)
@@ -551,26 +555,42 @@ class AdminServiceNamespaceRPCInterface:
         self._update('signalAllProcesses')
         return result
 
-    def getAllConfigInfo(self):
+    def getAllConfigInfo(self, full=False):
         """ Get info about all available process configurations. Each struct
         represents a single process (i.e. groups get flattened).
 
         @return array result  An array of process config info structs
         """
         self._update('getAllConfigInfo')
+        return self.getConfigInfo(full, None)
+    
+    def getConfigInfo(self, full=False, proc=None):
+        self._update('getConfigInfo')
+        groupName = None
+        procName = None
+        if proc != None:
+            groupName, procName = split_namespec(proc)
 
         configinfo = []
         for gconfig in self.adminserviced.options.process_group_configs:
+            if groupName != None and gconfig.name != groupName:
+                continue
             inuse = gconfig.name in self.adminserviced.process_groups
             for pconfig in gconfig.process_configs:
-                configinfo.append(
-                    { 'name': pconfig.name,
+                if procName != None and pconfig.name != procName:
+                    continue
+                cfg = { 'name': pconfig.name,
                       'group': gconfig.name,
                       'inuse': inuse,
                       'autostart': pconfig.autostart,
                       'enabled': pconfig.is_enabled(),
                       'group_prio': gconfig.priority,
-                      'process_prio': pconfig.priority })
+                      'process_prio': pconfig.priority }
+                if full:
+                    for key, val in pconfig.__dict__.items():
+                        if val is not None:
+                            cfg['config_%s' % key] = str(val)
+                configinfo.append(cfg)
 
         configinfo.sort()
         return configinfo
@@ -1023,7 +1043,7 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
                         continue
 
                     # Remove the pid file, use its existence to check if the process has started
-                    if os.path.exists(process.config.pid_file) and not process.config.check_status():
+                    if process.config.pid_file and os.path.exists(process.config.pid_file) and not process.config.check_status():
                         print "Removing %s in make_startallfunc" % process.config.pid_file
                         os.remove(process.config.pid_file)
     

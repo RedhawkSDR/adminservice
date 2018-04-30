@@ -1037,7 +1037,6 @@ class ServerOptions(Options):
         # see also redirect_stderr check in process_groups_from_parser()
         redirect_stderr = boolean(get(section, 'redirect_stderr', 'false' if default_klass is None else str(default_klass.redirect_stderr)))
         environment_str = get(section, 'environment', '', do_expand=False)
-        logfile_directory = get(section, 'logfile_directory', self.configroot.adminserviced.childlogdir if default_klass is None else default_klass.logfile_directory)
         stdout_cmaxbytes = byte_size(get(section,'stdout_capture_maxbytes','0'))
         stdout_events = boolean(get(section, 'stdout_events_enabled','false'))
         stderr_cmaxbytes = byte_size(get(section,'stderr_capture_maxbytes','0'))
@@ -1058,6 +1057,14 @@ class ServerOptions(Options):
         serverurl = get(section, 'serverurl', None if default_klass is None else default_klass.serverurl)
         if serverurl and serverurl.strip().upper() == 'AUTO':
             serverurl = None
+
+        logfile_directory = get(section, 'logfile_directory', None)
+        # If this isn't a REDHAWK config, default to the adminservice childlogdir setting
+        if logfile_directory is None and not defaults and default_klass is None:
+            logfile_directory = self.configroot.adminserviced.childlogdir
+        # If this is a REDHAWK config and it's not the default, use the default
+        elif default_klass is not None:
+            logfile_directory = default_klass.logfile_directory
 
         # Determine the enable flag - try convert it to a boolean
         enablement = get(section, 'enable', None)
@@ -1093,7 +1100,7 @@ class ServerOptions(Options):
             umask = octal_type(umask)
 
         process_name = process_or_group_name(
-            get(section, 'process_name', '%(program_name)s', do_expand=False))
+            get(section, 'process_name', '%(program_name)s', do_expand=False).split(':', 1))
 
         if stopasgroup and not killasgroup:
             raise ValueError(
@@ -1105,6 +1112,9 @@ class ServerOptions(Options):
 
         environment = dict_of_key_value_pairs(
             expand(environment_str, expansions, 'environment'))
+        # Update the expansions with what we just read so we can use them later
+        for key, value in environment.iteritems():
+            expansions["ENV_%s" % key] = value
 
         directory = get(section, 'directory', None if default_klass is None else default_klass.directory)
 
@@ -1211,7 +1221,7 @@ class ServerOptions(Options):
             args = {}
             for key in klass.add_req_param_names:
                 try:
-                    val = filter_comment(get(section, key))
+                    val = filter_comment(get(section, key, expansions=expansions))
                     if val is not None and len(val) > 0:
                         args[key] = val
                 except:
@@ -1219,7 +1229,7 @@ class ServerOptions(Options):
     
             for key in klass.optional_param_names:
                 try:
-                    val = filter_comment(get(section, key))
+                    val = filter_comment(get(section, key, expansions=expansions))
                     if val is not None and len(val) > 0:
                         args[key] = val
                 except:
@@ -2180,7 +2190,7 @@ class RedhawkProcessConfig(ProcessConfig):
         ]
     # Variables to set in the process' environment
     env_param_names = [
-        'ORB_CFG', 'OSSIEHOME', 'LD_LIBRARY_PATH', 'PYTHONPATH',
+        'ORB_CFG', 'OSSIEHOME', 'LD_LIBRARY_PATH', 'PYTHONPATH', 'SDRROOT',
         ]
     # Command line flags to start with
     command_line_flags = [
@@ -2237,6 +2247,9 @@ class RedhawkProcessConfig(ProcessConfig):
             else:
                 setattr(self, name, params.get(name, None))
         for name in self.optional_param_names:
+            # skip environment, the value we want is a dict, this resets it to a string
+            if name == 'environment':
+                continue
             val = params.get(name, None)
             if val is None and hasattr(self, name):
                 val = getattr(self, name, None)
@@ -2360,14 +2373,8 @@ class DomainConfig(RedhawkProcessConfig):
             self.command = self.make_command()
 
     def create_autochildlogs(self):
-        logdir = self.logfile_directory if self.logfile_directory is not None else self.options.childlogdir
-        if self.redirect_stderr:
-            self.logfile = os.path.join(logdir, "%s.log" % self.DOMAIN_NAME)
-            self.stderr_logfile = None
-            self.stdout_logfile = None
-        else:
-            self.stderr_logfile = os.path.join(logdir, "%s.stderr.log" % self.DOMAIN_NAME)
-            self.stdout_logfile = os.path.join(logdir, "%s.stdout.log" % self.DOMAIN_NAME)
+        self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'domain-mgrs')
+        RedhawkProcessConfig.create_autochildlogs(self)
         self.lock_file = os.path.join(self.options.childlockdir, 'domain-mgrs', "%s.lock" % self.DOMAIN_NAME)
 
 class NodeConfig(RedhawkProcessConfig):
@@ -2412,6 +2419,7 @@ class NodeConfig(RedhawkProcessConfig):
             self.command = self.make_command()
 
     def create_autochildlogs(self):
+        self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'device-mgrs')
         RedhawkProcessConfig.create_autochildlogs(self)
         self.lock_file = os.path.join(self.options.childlockdir, 'device-mgrs', "%s.%s.lock" % (self.DOMAIN_NAME, self.name))
 
@@ -2438,6 +2446,7 @@ class WaveformConfig(RedhawkProcessConfig):
             wave_name = self.WAVEFORM_INSTANCE_ID
             if self.WAVEFORM_NAME is not None:
                 wave_name += "." + self.WAVEFORM_NAME
+            self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'waveforms')
             self.lock_file = os.path.join(self.options.childlockdir, 'waveforms', "%s.%s.lock" % (self.DOMAIN_NAME, wave_name))
             self.pid_file = os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name))
 
@@ -2761,11 +2770,11 @@ def expand(s, expansions, name):
             (s, name, str(ex))
         )
 
-def make_namespec(group_name, process_name):
+def make_namespec(group_name, process_name, compress=True):
     # we want to refer to the process by its "short name" (a process named
     # process1 in the group process1 has a name "process1").  This is for
     # backwards compatibility
-    if group_name == process_name:
+    if compress and group_name == process_name:
         name = process_name
     else:
         name = '%s:%s' % (group_name, process_name)

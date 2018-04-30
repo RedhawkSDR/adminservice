@@ -108,7 +108,7 @@ class AdminService:
         removed = [cand for cand in cur if cand.name not in newdict]
 
         changed = [cand for cand in new
-                   if cand != curdict.get(cand.name, cand) or cand.ENABLE != curdict.get(cand.name, cand).ENABLE]
+                   if cand != curdict.get(cand.name, cand) or cand.enable != curdict.get(cand.name, cand).enable]
 
         return added, changed, removed
 

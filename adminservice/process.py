@@ -6,7 +6,6 @@ import shlex
 import traceback
 import signal
 import subprocess
-import inspect
 from exceptions import Exception
 
 from adminservice.medusa import asyncore_25 as asyncore
@@ -18,7 +17,6 @@ from adminservice.states import ALL_STOPPED_STATES
 from adminservice.states import STOPPED_STATES
 
 from adminservice.options import decode_wait_status
-from adminservice.options import readFile
 from adminservice.options import signame
 from adminservice.options import ProcessException, BadCommand
 

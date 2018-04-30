@@ -4,7 +4,7 @@ DOMAIN_NAME=                            ; required name of your domain - no defa
 SPD=/mgr/DeviceManager.spd.xml          ; required relative path to the DeviceManagers spd file
 DCD_FILE=                               ; optional relative path to the DCD file - uses NODE_NAME for path if blank
 NODE_NAME=                              ; optional if DCD_FILE is blank - name of your node
-SDRCACHE=/data/%(ENV_USER)s/tmp         ; optional absolute path for DeviceManager to create cache directory
+SDRCACHE=                               ; optional absolute path for DeviceManager to create cache directory
 CLIENT_WAIT_TIME=                       ; optional amount of time to wait (milliseconds) for completion of client requests
 ORB_ENDPOINT=                           ; optional Sets the endpoint for the DomainManager servant
 ORB_INITREF=                            ; optional pass to ORBInitRef N=V
@@ -28,20 +28,20 @@ conditional_config=/etc/redhawk/rh.cond.cfg   ; optional configuration file pass
 logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/device-mgr/<domain_name>.<node_name>.log
 stderr_logfile=                   ; optional stderr log file name; default AUTO
 stdout_logfile=                   ; optional stdout log file name; default AUTO
-redirect_stderr=true              ; optional redirect proc stderr to stdout (default false)
+redirect_stderr=True              ; optional redirect proc stderr to stdout (default false)
 
 directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts and services
 priority=400                      ; optional the relative start priority (default 999)
 run_detached=True                 ; optional run this process as a daemon
-autostart=false                   ; optional start at supervisord start (default: true)
+autostart=False                   ; optional start at supervisord start (default: true)
 startsecs=10                      ; optional # of secs prog must stay up to be running (def. 1)
 startretries=0                    ; optional max # of serial start failures when starting (default 3)
 stopsignal=TERM                   ; optional signal used to kill process (default TERM)
 autorestart=False                 ; optional when to restart if exited after running (def: False)
 ;exitcodes=0,2                    ; optional 'expected' exit codes used with autorestart (default 0,2)
 ;stopwaitsecs=10                  ; optional max num secs to wait b4 SIGKILL (default 10)
-;stopasgroup=false                ; optional send stop signal to the UNIX process group (default false)
-;killasgroup=false                ; optional SIGKILL the UNIX process group (def false)
+;stopasgroup=False                ; optional send stop signal to the UNIX process group (default false)
+;killasgroup=False                ; optional SIGKILL the UNIX process group (def false)
 ;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
 ;failafterwait=True               ; optional abort starting this group if the wait times out
 

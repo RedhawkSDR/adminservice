@@ -31,6 +31,7 @@ import urlparse
 import sys
 import threading
 import pkg_resources
+import xml.dom.minidom
 from operator import itemgetter
 
 from adminservice.medusa import asyncore_25 as asyncore
@@ -1038,11 +1039,39 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 raise
         else:
             configinfo = sorted(configinfo, key=itemgetter('group', 'name'))
+            self.ctl.output('%-32s %-9s %-9s %-9s %s' % ('Name', 'In Use', 'Autostart', 'Enabled', 'Priority'))
             for pinfo in configinfo:
                 self.ctl.output(self._formatConfigInfo(pinfo))
 
     def help_avail(self):
         self.ctl.output("avail\t\t\tDisplay all configured processes")
+
+    def do_getconfig(self, arg):
+        if not arg:
+            self.ctl.output('Error: getconfig requires a process name')
+            self.help_getconfig()
+            return
+
+        adminservice = self.ctl.get_adminservice()
+        try:
+            configinfo = adminservice.getConfigInfo(True, arg)
+        except xmlrpclib.Fault, e:
+            if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
+                self.ctl.output('ERROR: adminservice shutting down')
+            else:
+                raise
+        else:
+            configinfo = sorted(configinfo, key=itemgetter('group', 'name'))
+            for pinfo in configinfo:
+                self.ctl.output("%s Configuration:" % arg)
+                cfgs = [(key[7:],val) for (key, val) in pinfo.items() if key.startswith("config_")]
+                cfgs.sort()
+                for key,val in cfgs:
+                    self.ctl.output('\t%-32s %s' % (key,val))
+
+
+    def help_getconfig(self):
+        self.ctl.output("getconfig\t\t\tDisplay the configuration of a process")
 
     def do_reread(self, arg):
         if arg:
@@ -1338,16 +1367,74 @@ class DefaultControllerPlugin(ControllerPluginBase):
         }
 
     def do_config(self, arg):
-        if not self.config_files.has_key(arg):
+        args = arg.split(' ')
+        if len(args) == 0 or not self.config_files.has_key(args[0]):
             self.ctl.output('Error: incorrect config argument')
             self.help_config()
             return
-        config = pkg_resources.resource_string(__name__, self.config_files[arg])
+        config = self.process_config_args(args)
+        
         self.ctl.output(config)
 
     def help_config(self):
-        self.ctl.output('config <type>\tOutput a config file for the specified type to the screen')
-        self.ctl.output("\t\t<type> can be one of: admin, domain, node, waveform")
+        self.ctl.output('config <type> <xml file> <domain name>\tOutput a config file for the specified type to the screen')
+        self.ctl.output("\t\t<type>\tcan be one of: admin, domain, node, waveform")
+        self.ctl.output("\t\t<xml file>\tthe relative or absolute path to the .dcd.xml or .sad.xml file for the type specified")
+        self.ctl.output("\t\t<domain name>\toptional - the domain name to use for the node or waveform config file")
+
+    def process_config_args(self, args):
+        config = pkg_resources.resource_string(__name__, self.config_files[args[0]])
+        if len(args) > 1:
+            if 'node' == args[0]:
+                config = self.process_node_file(config, args)
+            elif 'domain' == args[0]:
+                config = self.process_domain_file(config, args)
+            elif 'waveform' == args[0]:
+                config = self.process_waveform_file(config, args)
+                
+        return config
+
+    def process_domain_file(self, config, args):
+        doc_dmd = xml.dom.minidom.parse(args[1])
+        
+        # Find the DMD associated with the domain
+        domainName = doc_dmd.getElementsByTagName('domainmanagerconfiguration')[0].getAttribute('name')
+
+        config = config.replace('[domain:domain1]', '[domain:%s_mgr]' % domainName)
+        config = config.replace('DOMAIN_NAME=   ', 'DOMAIN_NAME=%s' % domainName)
+
+        return config
+
+    def process_node_file(self, config, args):
+        doc_dcd = xml.dom.minidom.parse(args[1])
+        
+        # Find the DCD associated with the node
+        nodeName = doc_dcd.getElementsByTagName('deviceconfiguration')[0].getAttribute('name')
+        nodeSpdFile = doc_dcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('devicemanagersoftpkg')[0].getElementsByTagName('localfile')[0].getAttribute('name')
+        domainName = doc_dcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('domainmanager')[0].getElementsByTagName('namingservice')[0].getAttribute('name').split('/')[0]
+        if len(args) == 3:
+            domainName = args[2]
+
+        config = config.replace('[node:node1]', '[node:%s]' % nodeName)
+        config = config.replace('DOMAIN_NAME=   ', 'DOMAIN_NAME=%s' % domainName)
+        config = config.replace('NODE_NAME=   ', 'NODE_NAME=%s' % nodeName)
+        config = config.replace('DCD_FILE=   ', 'DCD_FILE=/nodes/%s/DeviceManager.dcd.xml' % nodeName)
+        config = config.replace('SPD=/mgr/DeviceManager.spd.xml', 'SPD=%s' % nodeSpdFile)
+
+        return config
+
+    def process_waveform_file(self, config, args):
+        doc_sad = xml.dom.minidom.parse(args[1])
+        
+        # Find the SAD associated with the waveform
+        nodeName = doc_sad.getElementsByTagName('softwareassembly')[0].getAttribute('name')
+
+        config = config.replace('[waveform:waveform1]', '[waveform:%s]' % nodeName)
+        config = config.replace('WAVEFORM_INSTANCE_ID=   ', 'WAVEFORM_INSTANCE_ID=%s' % nodeName)
+        if len(args) == 3:
+            config = config.replace('DOMAIN_NAME=   ', 'DOMAIN_NAME=%s' % args[2])
+
+        return config
 
 def split_namespec(name):
     # TODO this isn't right. This will make regular processes not work
