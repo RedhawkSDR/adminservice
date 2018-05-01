@@ -449,10 +449,10 @@ DEBUG_LEVEL = {
     }
 
 def debug_level(value):
-    value = str(value.lower())
     try:
         num = int(value)
     except (ValueError, TypeError):
+        value = str(value.lower())
         if not DEBUG_LEVEL.has_key(value):
             raise ValueError("invalid 'DEBUG_LEVEL' value %s" % value)
         num = DEBUG_LEVEL[value]
