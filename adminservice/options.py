@@ -2426,13 +2426,17 @@ class NodeConfig(RedhawkProcessConfig):
 class WaveformConfig(RedhawkProcessConfig):
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
     add_req_param_names.extend([
-        'WAVEFORM_INSTANCE_ID'
+        'WAVEFORM'
         ])
     optional_param_names = RedhawkProcessConfig.optional_param_names[:]
     optional_param_names.extend([
-        'WAVEFORM_NAME', 'WAVEFORM_URI', 'start_delay'
+        'INSTANCE_NAME', 'start_delay'
         ])
-    optional_param_names.extend(RedhawkProcessConfig.optional_command_line_param_names)
+    optional_command_line_param_names = RedhawkProcessConfig.optional_command_line_param_names[:]
+    optional_command_line_param_names.remove('ORB_ENDPOINT')
+    optional_command_line_param_names.remove('ORB_INITREF')
+    
+    optional_param_names.extend(optional_command_line_param_names)
     optional_param_names.extend(RedhawkProcessConfig.process_param_names)
     optional_param_names.extend(RedhawkProcessConfig.env_param_names)
     optional_param_names.extend(RedhawkProcessConfig.command_line_flags)
@@ -2443,23 +2447,19 @@ class WaveformConfig(RedhawkProcessConfig):
             if self.DOMAIN_NAME is None or self.DOMAIN_NAME.find(' ') > -1:
                 raise ValueError("Invalid value for %s: '%s'" % ('DOMAIN_NAME', self.DOMAIN_NAME))
 
-            wave_name = self.WAVEFORM_INSTANCE_ID
-            if self.WAVEFORM_NAME is not None:
-                wave_name += "." + self.WAVEFORM_NAME
+            wave_name = self.WAVEFORM
+            if self.INSTANCE_NAME is not None:
+                wave_name += "." + self.INSTANCE_NAME
             self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'waveforms')
             self.lock_file = os.path.join(self.options.childlockdir, 'waveforms', "%s.%s.lock" % (self.DOMAIN_NAME, wave_name))
             self.pid_file = os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name))
 
             self.command = self.command + " -d " + self.DOMAIN_NAME
-            self.command = self.command + " -w " + self.WAVEFORM_INSTANCE_ID
+            self.command = self.command + " -w " + self.WAVEFORM
             self.command = self.command + " -i " + self.pid_file
 
-            if self.WAVEFORM_NAME is not None:
-                self.command = self.command + " -n " + self.WAVEFORM_NAME
-            if self.WAVEFORM_URI is not None:
-                self.command = self.command + " -u " + self.WAVEFORM_URI
-            if self.ORB_INITREF is not None:
-                self.command = self.command + " " + self.convert_param_names['ORB_INITREF'] + " " + self.WAVEFORM_URI
+            if self.INSTANCE_NAME is not None:
+                self.command = self.command + " -n " + self.INSTANCE_NAME
             if self.start_delay is not None:
                 self.command = self.command + " --delay=" + self.start_delay
 

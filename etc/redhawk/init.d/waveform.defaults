@@ -2,10 +2,9 @@
 command=/etc/redhawk/init.d/redhawk-wf-control ; required absolute path to the waveform control script
 DOMAIN_NAME=                                   ; required name of your domain - no default
 # One of the next two is required
-WAVEFORM_INSTANCE_ID=                          ; required the name of the waveform(optionally namespaced) - no default
-WAVEFORM_URI=                                  ; required URI to the waveforms .sad.xml file - defaults when WAVEFORM_INSTANCE_ID is set
+WAVEFORM=                                      ; required the name of the waveform(optionally namespaced) - no default
 
-WAVEFORM_NAME=                                 ; optional name of the launched waveform
+INSTANCE_NAME=                                 ; optional name of the launched waveform
 
 enable=1                                       ; optional 1 to enable or 0 to disable this waveform
 conditional_config=/etc/redhawk/rh.cond.cfg    ; optional configuration file passed to customize the enable string

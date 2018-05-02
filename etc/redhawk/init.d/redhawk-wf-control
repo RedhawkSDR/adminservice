@@ -24,14 +24,11 @@ Options:
                         The domain name to attach to. Required for create and
                         remove                                               
 
-  -w WAVEFORMINSTANCENAME, --waveform-instance-name=WAVEFORMINSTANCENAME     
+  -w WAVEFORM, --waveform=WAVEFORM     
                         The name of the waveform(optionally namespaced). Required for create mode
 
-  -n WAVEFORMNAME, --waveform-name=WAVEFORMNAME     
+  -n INSTANCENAME, --instance-name=INSTANCENAME     
                         What to name the launched waveform. Optional for create mode
-
-  -u WAVEFORMURI, --waveform-uri=WAVEFORMURI                                 
-                        The name of the waveform. Optional for create mode
 
   -o OPERATION, --operation=OPERATION                                        
                         The operation to perform. Options: create, remove,
@@ -313,29 +310,20 @@ def getAvailableDomains():
 #####################################################################
 
 def createWaveform(dom, opts):
-    waveformInstanceName = opts.waveformInstanceName
-    waveformURI = opts.waveformURI
-    # Fix namespacing
-    if waveformInstanceName:
-        waveformInstancePath = waveformInstanceName.replace('.', '/')
-        parts = waveformInstancePath.split('/')
-        sadFileName = parts[len(parts) - 1]
-        if not waveformURI:
-            waveformURI = "/waveforms/" + waveformInstancePath + "/" + sadFileName + ".sad.xml"
-    elif waveformURI:
-        parts = waveformURI.split('/')
-        sadFileName = parts[len(parts) - 1].split('.')[0]
-    else:
-        print >>sys.stderr, "waveformURI and waveformInstance name are both missing, cannot launch waveform"
-        sys.exit(2)
-    waveformName = opts.waveformName if opts.waveformName else sadFileName
+    waveformName = opts.waveformName
+    # Handle namespaces, need path and the last part
+    waveformPath = waveformName.replace('.', '/')
+    parts = waveformPath.split('/')
+    sadFileName = parts[len(parts) - 1]
+    waveformURI = "/waveforms/" + waveformPath + "/" + sadFileName + ".sad.xml"
+    instanceName = opts.instanceName if opts.instanceName else sadFileName
 
     app = None
-    appFact = getAppFactory(dom, waveURI=waveformURI)
+    appFact = getAppFactory(dom, waveformURI)
     if not appFact: 
         try: 
             dom.installApplication(waveformURI)
-            appFact = getAppFactory(dom, waveURI=waveformURI)
+            appFact = getAppFactory(dom, waveformURI)
         except:
             appFact = None
 
@@ -349,50 +337,46 @@ def createWaveform(dom, opts):
         exc = None
         while True:
             try:
-                print "Calling create with waveform ID: %s" % waveformName
-                app = appFact.create(waveformName,[],[])
-                opts.waveformName = app.name
+                print "Calling create with waveform ID: %s" % instanceName
+                app = appFact.create(instanceName,[],[])
+                opts.instanceName = app.name
                 break
             except Exception, e:
-                print >>sys.stderr, "ERROR:: Failed to launch waveform %s with error %s" % (waveformName, e.msg)
+                print >>sys.stderr, "ERROR:: Failed to launch waveform %s with error %s" % (instanceName, e.msg)
                 if time.time() > end_time:
                     raise e
                 time.sleep(1)
             except:
-                print >>sys.stderr, "ERROR:: Failed to launch waveform %s"  % waveformName
+                print >>sys.stderr, "ERROR:: Failed to launch waveform %s"  % instanceName
                 raise
 
         try:
             app.start()
         except Exception, e:
-            print >>sys.stderr, "ERROR:: Failed to start waveform %s with error %s" % (waveformName, e.msg)
+            print >>sys.stderr, "ERROR:: Failed to start waveform %s with error %s" % (instanceName, e.msg)
             raise
         except:
-            print >>sys.stderr, "ERROR:: Failed to start waveform %s" % waveformName
+            print >>sys.stderr, "ERROR:: Failed to start waveform %s" % instanceName
             raise
     except:
         try:
             if app:
                 app.releaseObject()
         except Exception, e:
-            print >>sys.stderr, "ERROR:: Failed to release waveform %s with error %s" % (waveformName, e.msg)
+            print >>sys.stderr, "ERROR:: Failed to release waveform %s with error %s" % (instanceName, e.msg)
         except:
-            print >>sys.stderr, "ERROR:: Failed to release waveform %s" % waveformName
+            print >>sys.stderr, "ERROR:: Failed to release waveform %s" % instanceName
         sys.exit(1)
     waveformID = app._get_identifier()
-    print "Waveform: %s launched successfully with id: %s" % (waveformInstanceName, waveformID)
+    print "Waveform: %s launched successfully with id: %s" % (instanceName, waveformID)
 
     saveToPidFile(opts, waveformID)
 
-def getAppFactory(dom, waveInstanceName=None, waveAppID=None, waveURI=None):
+def getAppFactory(dom, waveURI):
     try:
         appfacs = dom._get_applicationFactories()
         for entry in appfacs:
-            if waveInstanceName and waveInstanceName == entry._get_name():
-                return entry
-            if waveAppID and waveAppID == entry._get_identifier():
-                return entry
-            if waveURI and waveURI == entry._get_softwareProfile():
+            if waveURI == entry._get_softwareProfile():
                 return entry
     except Exception, e:
         print >>sys.stderr, \
@@ -402,16 +386,13 @@ def getAppFactory(dom, waveInstanceName=None, waveAppID=None, waveURI=None):
 def saveToPidFile(opts, waveformID):
     pidFile = opts.pidFile
     if pidFile is not None:
-        waveformInstanceName = opts.waveformInstanceName
         waveformName = opts.waveformName
-        waveformURI = opts.waveformURI
+        instanceName = opts.instanceName
         output = sys.argv[0] + " -d " + opts.domainName
-        if waveformInstanceName is not None:
-            output += " --waveform-instance-name " + waveformInstanceName
         if waveformName is not None:
-            output += " --waveform-name " + waveformName
-        if waveformURI is not None:
-            output += " --waveform-uri " + waveformURI
+            output += " --waveform " + waveformName
+        if instanceName is not None:
+            output += " --instance-name " + instanceName
         output += " --waveform-id=" + waveformID
         try:
             fil = open(pidFile, 'w')
@@ -448,7 +429,7 @@ def compact_traceback():
 
 def removeWaveform(dom, opts): 
     waveformID = opts.waveformID
-    waveformInstanceName = opts.waveformInstanceName
+    waveformName = opts.waveformName
 
     waveform = None
     for app in dom.apps:
@@ -460,14 +441,14 @@ def removeWaveform(dom, opts):
                 print "Waveform ID: %s has been successfully released" % waveformID
                 break
 
-        elif app._get_name() == waveformInstanceName:
+        elif app._get_name() == waveformName:
             waveform = app
-            print "Releasing waveform %s. Please wait..." % waveformInstanceName
+            print "Releasing waveform %s. Please wait..." % waveformName
             waveform.releaseObject()
-            print "Waveform ID: %s has been successfully released" % waveformInstanceName
+            print "Waveform ID: %s has been successfully released" % waveformName
 
     if not waveform: 
-        print >>sys.stderr, "Waveform %s can NOT be found (is not currently running)!" % waveformInstanceName
+        print >>sys.stderr, "Waveform %s can NOT be found (is not currently running)!" % waveformName
         sys.exit(2)
 
 #####################################################################
@@ -481,8 +462,8 @@ def showStatus(dom, opts):
     if none is given, in the provided dom. """
 
     waveformID = opts.waveformID
-    searchName = opts.waveformInstanceName if opts.waveformName is None else opts.waveformName
-    if not opts.waveformInstanceName and not opts.waveformName and not opts.quiet:
+    searchName = opts.waveformName if opts.instanceName is None else opts.instanceName
+    if not opts.waveformName and not opts.instanceName and not opts.quiet:
         listAllAvailableWaveforms(dom)
     else: 
         found = False
@@ -496,10 +477,10 @@ def showStatus(dom, opts):
                 if searchName and app.name.startswith(searchName):
                     running = displayWaveformStatus(opts, app, searchName) 
                     found = True
-            if not found and waveformInstanceName is not None:
+            if not found and waveformName is not None:
                 for app in dom.apps:
-                    if waveformInstanceName and app.name.startswith(waveformInstanceName):
-                        running = displayWaveformStatus(opts, app, waveformInstanceName) 
+                    if waveformName and app.name.startswith(waveformName):
+                        running = displayWaveformStatus(opts, app, waveformName) 
                         found = True
     
         if not found:
@@ -521,25 +502,25 @@ def listAllAvailableWaveforms(dom):
     print "Running Waveforms in %s:" % dom.name
     print waveforms
 
-def displayWaveformStatus(opts, waveform, waveformInstanceName, waveformID=None): 
+def displayWaveformStatus(opts, waveform, waveformName, waveformID=None): 
     running = False
     status = "Not Running"
 
     if waveform: 
         running = True
         status = "Running"
-        waveformInstanceName = waveform.name
+        waveformName = waveform.name
         waveformID = waveform._get_identifier()
     
-    if not waveformInstanceName: 
-        waveformInstanceName = "Unknown"
+    if not waveformName: 
+        waveformName = "Unknown"
 
     if not waveformID: 
         waveformID = "Unknown"
 
     if not opts.quiet:
         printDividerLine('=', 50)
-        print "Name:\t" + waveformInstanceName
+        print "Name:\t" + waveformName
         print "Status:\t" + status
         print "ID:\t" + waveformID
 
@@ -547,13 +528,13 @@ def displayWaveformStatus(opts, waveform, waveformInstanceName, waveformID=None)
             print "Components:"
             comps = waveform.comps
             for comp in comps:
-                displayComponentStatus(opts, waveformInstanceName, comp)
+                displayComponentStatus(opts, waveformName, comp)
     return running
 
-def displayComponentStatus(opts, waveformInstanceName, comp): 
+def displayComponentStatus(opts, waveformName, comp): 
     """ Displays Component Information and properties"""
     compID = comp._get_identifier()
-    if waveformInstanceName in str(compID): 
+    if waveformName in str(compID): 
         compID = str(compID).split(':')[0]
 
     printDividerLine('-', 50)
@@ -622,12 +603,10 @@ def processFlags():
     # Add the flags
     parser.add_option('-d', '--domain-name', dest="domainName",
             help="The domain name to attach to. Required for create and remove")
-    parser.add_option('-w', '--waveform-instance-name', dest="waveformInstanceName",
+    parser.add_option('-w', '--waveform', dest="waveformName",
             help="The name of the waveform(optionally namespaced). Required for create mode")
-    parser.add_option('-n', '--waveform-name', dest="waveformName",
+    parser.add_option('-n', '--instance-name', dest="instanceName",
             help="What to name the launched waveform. Optional for create mode")
-    parser.add_option('-u', '--waveform-uri', dest="waveformURI",
-            help="The name of the waveform. Optional for create mode")
     parser.add_option('-o','--operation', dest="operation",
             help="The operation to perform. Options: "+", ".join(operations),
             default="status", choices=operations)
@@ -664,18 +643,17 @@ def verifyFlags(options, parser):
     """ Verifies the correct operations have the required information to proceed """
     operation = options.operation.lower()
 
-    if operation == "create" and \
-            ((not options.waveformURI and not options.waveformInstanceName) or not options.domainName):
-        parser.error("Create operation requires Domain Name and either Waveform Name or Waveform URI.")
+    if operation == "create" and (not options.waveformName or not options.domainName):
+        parser.error("Create operation requires Domain Name and either Waveform Name.")
         
     if operation == "remove" and \
-            (not options.waveformInstanceName or not options.domainName):
-        parser.error("Remove operation requires Domain Name and Waveform Instance Name")
+            ((not options.waveformID and not options.waveformName) or not options.domainName):
+        parser.error("Remove operation requires Domain Name and Waveform Instance Name or Waveform ID.")
 
 
     # If no flags were given print the help but continue on, since we want to
     # display a list of domains
-    if not options.waveformInstanceName and not options.domainName: 
+    if not options.waveformName and not options.domainName: 
         parser.print_help()
 
 #####################################################################

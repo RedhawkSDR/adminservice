@@ -99,18 +99,13 @@ install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/device-mgrs
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/domain-mgrs
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/waveforms
 %{__cp} -r etc $RPM_BUILD_ROOT/
+%{__mv} $RPM_BUILD_ROOT/%{_sysconfdir}/redhawk/cron.d $RPM_BUILD_ROOT/%{_sysconfdir}/cron.d
 %{__cp} -r bin/* $RPM_BUILD_ROOT/%{_bindir}
 %if 0%{?with_systemd}
 %{__mkdir_p} $RPM_BUILD_ROOT%{_unitdir}
 %{__cp} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d/redhawk-adminservice.service $RPM_BUILD_ROOT%{_unitdir}
 %endif
 echo "ENABLED" > $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/rh.cond.cfg
-#%{__mkdir_p} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/{domains.d,nodes.d,waveforms.d}
-#%{__mkdir_p} $RPM_BUILD_ROOT%{_localstatedir}/{log,lock,run}/redhawk
-#%{__mkdir_p} $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/{device-mgrs,domain-mgrs,waveforms}
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/domains.d/*
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/nodes.d/*
-rm -f $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/waveforms.d/*
 
 
 %clean
@@ -136,8 +131,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(775,root,redhawk) %{_sysconfdir}/redhawk/init.d/redhawk-adminservice
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/redhawk-adminservice.service
 %attr(775,root,redhawk) %{_sysconfdir}/redhawk/init.d/redhawk-wf-control
-%dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/cron.d
-%attr(644,root,redhawk) %{_sysconfdir}/redhawk/cron.d/redhawk
+%attr(644,root,redhawk) %{_sysconfdir}/cron.d/redhawk
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/logging
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/logging/default.logging.properties
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/logging/example.logging.properties
@@ -165,8 +159,6 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %post
-cp %{_sysconfdir}/redhawk/cron.d/redhawk %{_sysconfdir}/cron.d
-
 %if 0%{?with_systemd}
 %systemd_post redhawk-adminservice.service
 
@@ -187,8 +179,6 @@ service crond reload > /dev/null 2>&1 || :
 %endif
 
 %postun
-[ -f %{_sysconfdir}/cron.d/redhawk ] && rm -f  %{_sysconfdir}/cron.d/redhawk || :
-
 %if 0%{?with_systemd}
 %systemd_postun_with_restart redhawk-adminservice.service
 
