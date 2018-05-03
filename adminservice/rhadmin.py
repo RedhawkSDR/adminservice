@@ -32,6 +32,7 @@ import re
 import os
 import sys
 import threading
+import time
 import pkg_resources
 import xml.dom.minidom
 from operator import itemgetter
@@ -765,6 +766,15 @@ class DefaultControllerPlugin(ControllerPluginBase):
                         else:
                             raise
                 else:
+                    proc_info = adminservice.getProcessInfo(name)
+                    enabled = proc_info['enabled']
+                    # print a message if this process won't be started or if it already is started
+                    if proc_info['state'] in states.RUNNING_STATES:
+                        self.ctl.output('%s is already running' % name)
+                        continue
+                    elif not enabled and not boolean(force):
+                        self.ctl.output('%s is not enabled, use -f to force' % name)
+                        continue
                     try:
                         result = adminservice.startProcess(name, force)
                     except xmlrpclib.Fault, e:
@@ -1201,14 +1211,14 @@ class DefaultControllerPlugin(ControllerPluginBase):
             adminservice.removeProcessGroup(gname)
             log(gname, "removed process group")
 
+        waitfor = {}
         for gname in changed:
             if valid_gnames and gname not in valid_gnames:
                 continue
-            results = adminservice.stopProcessGroup(gname)
-            log(gname, "stopped")
-
-            adminservice.removeProcessGroup(gname)
-            adminservice.addProcessGroup(gname)
+            # Update the group and have the process definitions re-run their transitions
+            results = adminservice.updateProcessGroup(gname)
+            # Keep track of the processes for the group, need to watch them start
+            waitfor[gname] = results
             log(gname, "updated process group")
 
         for gname in added:
@@ -1216,6 +1226,40 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 continue
             adminservice.addProcessGroup(gname)
             log(gname, "added process group")
+
+        # Loop through all the groups that we've changed in the order that we changed them
+        for gname in changed:
+            procs = waitfor[gname]
+            if procs is not None:
+                # Loop through each process and get its status
+                for proc in procs:
+                    procInfo = adminservice.getProcessInfo("%s:%s" % (gname, proc))
+                    procName = procInfo['name']
+                    state = procInfo['state']
+
+                    if state == states.ProcessStates.STARTING:
+                        self.ctl.output("Waiting on %s to start" % procName)
+
+                    # If the process is in the starting state, watch until it's not in that state anymore
+                    while state in [states.ProcessStates.STARTING]:
+                        time.sleep(2)
+                        procInfo = adminservice.getProcessInfo("%s:%s" % (gname, proc))
+                        state = procInfo['state']
+
+                    if state == states.ProcessStates.RUNNING:
+                        self.ctl.output("%s started" % procName)
+                        continue
+                    elif not state in [states.ProcessStates.STOPPED, states.ProcessStates.DISABLED]:
+                        self.ctl.output("%s didn't start, state is %s" % (procName, states.getProcessStateDescription(state)))
+
+        # Loop through all the defined processes and make sure the disabled ones are stopped
+        for info in adminservice.getAllProcessInfo():
+            if info['state'] in states.RUNNING_STATES and not info['enabled']:
+                group = info['group']
+                name = ('%s:' % group if group else '') + info['name']
+
+                self.ctl.output("%s shouldn't be running, stopping" % name)
+                adminservice.stopProcess(name)
 
     def help_update(self):
         self.ctl.output("update\t\t\tReload config and add/remove as necessary, and will restart affected programs")

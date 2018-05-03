@@ -444,6 +444,52 @@ class AdminServiceNamespaceRPCInterface:
 
         return True
 
+    def updateProcessGroup(self, name, wait=True):
+        """ Stop all processes in the process group named 'name'
+
+        @param string name     The group name
+        @param boolean wait    Wait for each process to be fully stopped
+        @return array result   An array of process status info structs
+        """
+        self._update('updateProcessGroup')
+
+        group = self.adminserviced.process_groups.get(name)
+
+        if group is None:
+            raise RPCError(Faults.BAD_NAME, name)
+
+        # Get the new process configuration for the group
+        config = None
+        newProcs = []
+        for cfg in self.adminserviced.options.process_group_configs:
+            if cfg.name == name:
+                config = cfg
+                newProcs = [proc.name for proc in cfg.process_configs]
+                break
+
+        # If there's nothing, remove the group and return
+        if len(newProcs) == 0:
+            self.stopProcessGroup(name, wait)
+            self.adminserviced.remove_process_group(group)
+            return
+        
+        oldProcs = group.processes.values()
+        oldProcs.sort()
+        oldProcs.reverse()
+
+        # Stop any processes that were in the old config, but aren't in the new one
+        for proc in oldProcs:
+            if not proc.config.name in newProcs and proc.state in RUNNING_STATES:
+                self.adminserviced.options.logger.debug("Process %s is in state %d, stopping" % (proc.config.name, proc.state))
+                self.stopProcess(proc.config.name, wait)
+
+        # Save the new config and return the current process names
+        config.after_setuid()
+        self.adminserviced.process_groups[name] = config.make_group()
+        procs = self.adminserviced.process_groups[name].processes.values()
+        procs.sort()
+        return [ proc.config.name for proc in procs ]
+
     def stopProcessGroup(self, name, wait=True):
         """ Stop all processes in the process group named 'name'
 
@@ -658,6 +704,7 @@ class AdminServiceNamespaceRPCInterface:
             'start':start,
             'stop':stop,
             'now':now,
+            'enabled':process.config.is_enabled(),
             'state':state,
             'statename':getProcessStateDescription(state),
             'spawnerr':spawnerr,
