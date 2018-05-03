@@ -19,7 +19,6 @@ stderr_logfile=                   ; optional stderr log file name; default AUTO
 stdout_logfile=                   ; optional stdout log file name; default AUTO
 redirect_stderr=True              ; optional redirect proc stderr to stdout (default false)
 
-
 directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts
 priority=900                      ; optional the relative start priority (default 999)
 run_detached=True                 ; optional run this process as a daemon
@@ -38,11 +37,6 @@ stopsignal=TERM                   ; optional signal used to kill process (defaul
 ;user=redhawk                     ; optional setuid to this UNIX account to run the program
 ;group=redhawk                    ; optional setgid to this UNIX group to run the program
 ;umask=022                        ; optional umask for process (default None)
-
-;nicelevel=                       ; optional cmd line args to pass to nice when running process
-;affinity=                        ; optional cmd line args to pass to numactl when running process
-;ulimit=                          ; optional cmd line args to pass to ulimit before running process
-;corefiles=0                      ; optional 1 enable core files, 0 use ulimit settings
 
 ;start_pre_script=                ; optional script to run before starting the process
 ;start_post_script=               ; optional script to run after starting the process

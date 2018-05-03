@@ -28,6 +28,8 @@ import getpass
 import xmlrpclib
 import socket
 import urlparse
+import re
+import os
 import sys
 import threading
 import pkg_resources
@@ -39,6 +41,7 @@ from adminservice.medusa import asyncore_25 as asyncore
 from adminservice.datatypes import boolean
 from adminservice.options import ClientOptions
 from adminservice.options import make_namespec
+from adminservice.options import readFile
 from adminservice.options import split_namespec as sn
 from adminservice import xmlrpc
 from adminservice import states
@@ -292,15 +295,22 @@ class Controller(cmd.Cmd):
             elif action in ('add', 'remove', 'update'):
                 matches = self._complete_groups(text)
             # actions that accept a process name
-            elif action in ('clear', 'fg', 'pid', 'restart', 'signal',
+            elif action in ('clear', 'fg', 'getconfig', 'pid', 'restart', 'signal',
                             'start', 'status', 'stop', 'tail'):
                 matches = self._complete_processes(text)
+            elif action in ('config'):
+                matches = self._complete_config(text)
         if len(matches) > state:
             return matches[state]
 
     def _complete_actions(self, text):
         """Build a completion list of action names matching text"""
-        return [ a + ' ' for a in self.vocab if a.startswith(text)]
+        return [ a + ' ' for a in self.vocab if a.startswith(text) ]
+
+    def _complete_config(self, text):
+        """Build a completion list of config names matching text"""
+        config_opts = ['admin', 'domain', 'node', 'waveform']
+        return [ a + ' ' for a in config_opts if a.startswith(text) ]
 
     def _complete_groups(self, text):
         """Build a completion list of group names matching text"""
@@ -1395,49 +1405,66 @@ class DefaultControllerPlugin(ControllerPluginBase):
         return config
 
     def process_domain_file(self, config, args):
-        doc_dmd = xml.dom.minidom.parse(args[1])
+        dmdFile = args[1]
+        docDmd = xml.dom.minidom.parse(dmdFile)
+        
+        iniFile = dmdFile.replace('.dmd.xml', '.ini')
+        if os.path.exists(iniFile):
+            iniContents = readFile(iniFile, 0, 0)
+            config = iniContents if len(iniContents) > 0 else config
         
         # Find the DMD associated with the domain
-        domainName = doc_dmd.getElementsByTagName('domainmanagerconfiguration')[0].getAttribute('name')
+        domainName = docDmd.getElementsByTagName('domainmanagerconfiguration')[0].getAttribute('name')
 
-        config = config.replace('[domain:domain1]', '[domain:%s_mgr]' % domainName)
-        config = config.replace('DOMAIN_NAME=   ', 'DOMAIN_NAME=%s' % domainName)
+        config = re.sub(r"\[domain:.*\]", '[domain:%s_mgr]' % domainName, config)
+        config = re.sub(r"DOMAIN_NAME=.*?([;\n])", 'DOMAIN_NAME=%s \\1' % domainName, config)
 
         return config
 
     def process_node_file(self, config, args):
-        doc_dcd = xml.dom.minidom.parse(args[1])
+        dcdFile = args[1]
+        docDcd = xml.dom.minidom.parse(dcdFile)
+        
+        iniFile = dcdFile.replace('.dcd.xml', '.ini')
+        if os.path.exists(iniFile):
+            iniContents = readFile(iniFile, 0, 0)
+            config = iniContents if len(iniContents) > 0 else config
         
         # Find the DCD associated with the node
-        nodeName = doc_dcd.getElementsByTagName('deviceconfiguration')[0].getAttribute('name')
-        nodeSpdFile = doc_dcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('devicemanagersoftpkg')[0].getElementsByTagName('localfile')[0].getAttribute('name')
-        domainName = doc_dcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('domainmanager')[0].getElementsByTagName('namingservice')[0].getAttribute('name').split('/')[0]
+        nodeName = docDcd.getElementsByTagName('deviceconfiguration')[0].getAttribute('name')
+        nodeSpdFile = docDcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('devicemanagersoftpkg')[0].getElementsByTagName('localfile')[0].getAttribute('name')
+        domainName = docDcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('domainmanager')[0].getElementsByTagName('namingservice')[0].getAttribute('name').split('/')[0]
         if len(args) == 3:
             domainName = args[2]
 
-        config = config.replace('[node:node1]', '[node:%s]' % nodeName)
-        config = config.replace('DOMAIN_NAME=   ', 'DOMAIN_NAME=%s' % domainName)
-        config = config.replace('NODE_NAME=   ', 'NODE_NAME=%s' % nodeName)
-        config = config.replace('DCD_FILE=   ', 'DCD_FILE=/nodes/%s/DeviceManager.dcd.xml' % nodeName)
-        config = config.replace('SPD=/mgr/DeviceManager.spd.xml', 'SPD=%s' % nodeSpdFile)
+        config = re.sub(r"\[node:.*\]", '[node:%s]' % nodeName, config)
+        config = re.sub(r"DOMAIN_NAME=.*?([;\n])", 'DOMAIN_NAME=%s \\1' % domainName, config)
+        config = re.sub(r"NODE_NAME=.*?([;\n])", 'NODE_NAME=%s \\1' % nodeName, config)
+        config = re.sub(r"DCD_FILE=.*?([;\n])", 'DCD_FILE=/nodes/%s/DeviceManager.dcd.xml \\1' % nodeName, config)
+        config = re.sub(r"SPD=.*?([;\n])", 'SPD=%s \\1' % nodeSpdFile, config)
 
         return config
 
     def process_waveform_file(self, config, args):
-        doc_sad = xml.dom.minidom.parse(args[1])
+        sadFile = args[1]
+        docSad = xml.dom.minidom.parse(args[1])
         
-        # Find the SAD associated with the waveform
-        nodeName = doc_sad.getElementsByTagName('softwareassembly')[0].getAttribute('name')
+        iniFile = sadFile.replace('.sad.xml', '.ini')
+        if os.path.exists(iniFile):
+            iniContents = readFile(iniFile, 0, 0)
+            config = iniContents if len(iniContents) > 0 else config
 
-        config = config.replace('[waveform:waveform1]', '[waveform:%s]' % nodeName)
-        config = config.replace('WAVEFORM_INSTANCE_ID=   ', 'WAVEFORM_INSTANCE_ID=%s' % nodeName)
+        # Find the SAD associated with the waveform
+        waveformName = docSad.getElementsByTagName('softwareassembly')[0].getAttribute('name')
+
+        config = re.sub(r"\[waveform:.*\]", '[waveform:%s]' % waveformName, config)
+        config = re.sub(r"WAVEFORM=.*?([;\n])", 'WAVEFORM=%s \\1' % waveformName, config)
         if len(args) == 3:
-            config = config.replace('DOMAIN_NAME=   ', 'DOMAIN_NAME=%s' % args[2])
+            config = re.sub(r"DOMAIN_NAME=.*?([;\n])", 'DOMAIN_NAME=%s \\1' % args[2], config)
 
         return config
 
 def split_namespec(name):
-    # TODO this isn't right. This will make regular processes not work
     if name.find(":") != -1:
         return sn(name)
     return name, None

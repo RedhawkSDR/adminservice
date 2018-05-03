@@ -5,7 +5,7 @@ DMD_FILE=/domain/DomainManager.dmd.xml  ; required relative path to the DMD file
 
 FORCE_REBIND=0                          ; optional 1 - force rebind Domain in NamingService, 0 - do not rebind
 PERSISTENCE= 0                          ; optional 1 to turn on, 0 for off
-DB_URL=                                 ; optional path to where the db file gets saved
+DB_FILE=                                ; optional path to where the domain persistence file gets saved
 ORB_ENDPOINT=                           ; optional Sets the endpoint for the DomainManager servant
 ORB_INITREF=                            ; optional -ORBInitRef to pass to the process
 USELOGCFG=                              ; optional 1 to enable use of libossielog.so to resolve LOGGING_CONFIG_URI
@@ -49,7 +49,7 @@ stopsignal=TERM                ; optional signal used to kill process (default T
 ;nicelevel=                    ; optional cmd line args to pass to nice when running process
 ;affinity=                     ; optional cmd line args to pass to numactl when running process
 ;ulimit=                       ; optional cmd line args to pass to ulimit before running process
-;corefiles=0                   ; optional 1 enable core files, 0 use ulimit settings
+;corefiles=0                   ; optional max core file size or 0 to use ulimit settings
 
 ;start_pre_script=             ; optional script to run before starting the process
 ;start_post_script=            ; optional script to run after starting the process

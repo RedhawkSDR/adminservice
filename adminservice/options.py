@@ -2307,7 +2307,7 @@ class RedhawkProcessConfig(ProcessConfig):
     
             ulimit = ''
             if self.ulimit is not None:
-                ulimit = "ulimit %s %s >/dev/null 2>&1;" % (self.ulimit, self.corefiles if self.corefiles is not None else '')
+                ulimit = "ulimit %s %s >/dev/null 2>&1;" % (self.ulimit, ('-c ' + self.corefiles) if self.corefiles is not None else '')
             elif self.corefiles is not None:
                 ulimit = "ulimit -c %s >/dev/null 2>&1;" % self.corefiles
     
@@ -2342,7 +2342,7 @@ class DomainConfig(RedhawkProcessConfig):
         ])
     optional_command_line_param_names = RedhawkProcessConfig.optional_command_line_param_names[:]
     optional_command_line_param_names.extend([
-        'FORCE_REBIND', 'PERSISTENCE', 'DB_URL',
+        'FORCE_REBIND', 'PERSISTENCE', 'DB_FILE',
         ])
     
     command_line_flags = RedhawkProcessConfig.command_line_flags[:]
@@ -2355,6 +2355,8 @@ class DomainConfig(RedhawkProcessConfig):
     optional_param_names.extend(RedhawkProcessConfig.env_param_names)
     optional_param_names.extend(command_line_flags)
     
+    convert_param_names = dict(RedhawkProcessConfig.convert_param_names, DB_FILE='DB_URL')
+
     def setValues(self, config_name, defaults, params):
         RedhawkProcessConfig.setValues(self, config_name, defaults, params)
 
