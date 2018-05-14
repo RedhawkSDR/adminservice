@@ -272,7 +272,7 @@ class AdminServiceNamespaceRPCInterface:
 
         return group, process
 
-    def startProcess(self, name, force, wait=True):
+    def startProcess(self, name, force, proc_type='', wait=True):
         """ Start a process
 
         @param string name Process name (or ``group:name``, or ``group:*``)
@@ -351,12 +351,14 @@ class AdminServiceNamespaceRPCInterface:
 
         return True
 
-    def startProcessGroup(self, name, force, wait=True):
+    def startProcessGroup(self, name, force, proc_type, wait=True):
         """ Start all processes in the group named 'name'
 
-        @param string name     The group name
-        @param boolean wait    Wait for each process to be fully started
-        @return array result   An array of process status info structs
+        @param string name      The group name
+        @param string force     whether or not to override the enable setting when starting processes
+        @param string proc_type Optionally the [domain, nodes, waveforms] type of process to start
+        @param boolean wait     Wait for each process to be fully started
+        @return array result    An array of process status info structs
         """
         self._update('startProcessGroup')
 
@@ -371,29 +373,30 @@ class AdminServiceNamespaceRPCInterface:
         processes = [ (group, process) for process in processes]
 
         startall = make_startallfunc(processes, isNotRunning, self.startProcess,
-                                force=str(force), wait=wait)
+                                force=str(force), proc_type=proc_type, wait=wait)
 
         startall.delay = 0.05
         startall.rpcinterface = self
         return startall # deferred
 
-    def startAllProcesses(self, wait=True):
+    def startAllProcesses(self, proc_type='', wait=True):
         """ Start all processes listed in the configuration file
 
-        @param boolean wait    Wait for each process to be fully started
-        @return array result   An array of process status info structs
+        @param string proc_type Optionally the [domain, nodes, waveforms] type of process to start
+        @param boolean wait     Wait for each process to be fully started
+        @return array result    An array of process status info structs
         """
         self._update('startAllProcesses')
 
         processes = self._getAllProcesses()
         startall = make_allfunc(processes, isNotRunning, self.startProcess,
-                                force=False, wait=wait)
+                                force=False, proc_type=proc_type, wait=wait)
 
         startall.delay = 0.05
         startall.rpcinterface = self
         return startall # deferred
 
-    def stopProcess(self, name, wait=True):
+    def stopProcess(self, name, proc_type='', wait=True):
         """ Stop a process named by name
 
         @param string name  The name of the process to stop (or 'group:name')
@@ -490,7 +493,7 @@ class AdminServiceNamespaceRPCInterface:
         procs.sort()
         return [ proc.config.name for proc in procs ]
 
-    def stopProcessGroup(self, name, wait=True):
+    def stopProcessGroup(self, name, proc_type='', wait=True):
         """ Stop all processes in the process group named 'name'
 
         @param string name     The group name
@@ -510,13 +513,13 @@ class AdminServiceNamespaceRPCInterface:
         processes = [ (group, process) for process in processes ]
 
         killall = make_allfunc(processes, isRunning, self.stopProcess,
-                               wait=wait)
+                               proc_type=proc_type, wait=wait)
 
         killall.delay = 0.05
         killall.rpcinterface = self
         return killall # deferred
 
-    def stopAllProcesses(self, wait=True):
+    def stopAllProcesses(self, proc_type='', wait=True):
         """ Stop all processes in the process list
 
         @param  boolean wait   Wait for each process to be fully stopped
@@ -527,7 +530,7 @@ class AdminServiceNamespaceRPCInterface:
         processes = self._getAllProcesses(reverse=True)
 
         killall = make_allfunc(processes, isRunning, self.stopProcess,
-                               wait=wait)
+                               proc_type=proc_type, wait=wait)
 
         killall.delay = 0.05
         killall.rpcinterface = self
@@ -705,6 +708,7 @@ class AdminServiceNamespaceRPCInterface:
             'stop':stop,
             'now':now,
             'enabled':process.config.is_enabled(),
+            'config_type':process.config.config_type,
             'state':state,
             'statename':getProcessStateDescription(state),
             'spawnerr':spawnerr,
@@ -986,8 +990,11 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
         ):
 
         if not callbacks:
+            proc_type = extra_kwargs['proc_type'] if extra_kwargs.has_key('proc_type') else ''
 
             for group, process in processes:
+                if len(proc_type) != 0 and not proc_type.startswith(process.config.config_type):
+                    continue
                 name = make_namespec(group.config.name, process.config.name)
                 if predicate(process):
                     try:
@@ -1077,8 +1084,13 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
 
         if not callbacks:
             force = boolean(extra_kwargs['force'])
+            proc_type = extra_kwargs['proc_type']
+
             last_state = None
             for group, process in processes:
+                if len(proc_type) != 0 and not proc_type.startswith(process.config.config_type):
+                    continue
+
                 timed_out = False
                 name = make_namespec(group.config.name, process.config.name)
                 if predicate(process):

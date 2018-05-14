@@ -810,7 +810,11 @@ class ServerOptions(Options):
                 continue
             config_name = process_or_group_name(section.split(':', 1))
             priority = integer(get(section, 'priority', 999))
-            enabled = boolean(get(section, 'enable', 'True'))
+            enabled = get(section, 'enable', 'True')
+            try:
+                enabled = boolean(enabled)
+            except ValueError:
+                enabled = True
             processes = self.processes_from_section(parser, section, config_name,
                                                     ProcessConfig, False, None)
             groups.append(ProcessGroupConfig(self, config_name, priority, enabled, processes))
@@ -1074,7 +1078,18 @@ class ServerOptions(Options):
             enabled = boolean(enablement)
             enablement = enabled
         except ValueError:
-            pass
+            # If it's not a form of a true/false string, make it into a regex
+            if enablement.startswith('"') and enablement.endswith('"'):
+                enablement = enablement[1:len(enablement)-1]
+
+            # If there's an =, allow for arbitrary white space before/after
+            if "=" in enablement:
+                splt = enablement.split("=")
+                enablement = re.escape(splt[0]) + "\s*"
+                for val in splt[1:]:
+                    enablement = enablement + "=\s*" + re.escape(val)
+            # Match the entire line
+            enablement = "^" + enablement + "$"
 
         # find uid from "user" option
         user = get(section, 'user', None)
@@ -2003,6 +2018,7 @@ class UnhosedConfigParser(ConfigParser.RawConfigParser):
 
 
 class Config(object):
+    config_type = 'generic'
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -2035,6 +2051,7 @@ class Config(object):
                                                  self.name)
 
 class ProcessConfig(Config):
+    config_type = 'process'
     req_param_names = [
         'name', 'uid', 'gid', 'command', 'directory', 'umask', 'priority',
         'autostart', 'autorestart', 'startsecs', 'startretries',
@@ -2093,6 +2110,16 @@ class ProcessConfig(Config):
         if self.run_detached and self.pid_file is None:
             self.pid_file = os.path.join(self.options.childpiddir, "%s.%s.pid" % (self.name, self.sid))
 
+        redirect = ''
+        if hasattr(self, 'logfile'):
+            redirect = ">>%s%s" % ('' if self.redirect_stderr else '', self.logfile)
+        else:
+            redirect = ">>%s%s" % ('' if self.redirect_stderr else '', self.stdout_logfile)
+        if self.redirect_stderr:
+            redirect = redirect + " 2>&1"
+        else:
+            redirect = "%s 2>> %s" % (redirect, self.stderr_logfile)
+        self.output_redirect = redirect
 
     def make_process(self, group=None):
         from adminservice.process import Subprocess
@@ -2122,8 +2149,11 @@ class ProcessConfig(Config):
         if self.enable is True or self.enable is False:
             return self.enable
         if self.conditional_config is not None:
+            # read in the config file
             enablement = readFile(self.conditional_config, 0, 0)
-            return enablement.strip() == self.enable
+            # We read in the entire file with \n's, re.MULTILINE allows ^$ to match the \n line instead of the whole string
+            groups = re.search(self.enable, enablement, re.MULTILINE)
+            return groups is not None
 
     def get_pid(self):
         pid = -1
@@ -2136,7 +2166,22 @@ class ProcessConfig(Config):
         return pid
 
     def get_start_command(self):
-        return self.command
+        cmd = self.command
+        if self.run_detached:
+            pre_script = ''
+            if self.start_pre_script is not None:
+                script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_pre_script) else '.', self.start_pre_script)
+                pre_script = ("%s %s;" % (script, self.output_redirect))
+
+            post_script = ''
+            if self.start_post_script is not None:
+                script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_post_script) else '.', self.start_post_script)
+                post_script = ("; %s %s" % (script, self.output_redirect))
+            
+            pid = (" echo $! > %s" % self.pid_file) if self.pid_file is not None else ''
+            
+            cmd = '/bin/bash -c "%s %s %s & %s %s"' % (pre_script, cmd, self.output_redirect, pid, post_script)
+        return cmd
 
     def get_stop_command(self):
         return None
@@ -2174,6 +2219,7 @@ class ProcessConfig(Config):
         return False
 
 class RedhawkProcessConfig(ProcessConfig):
+    config_type = 'redhawk'
     req_param_names = ProcessConfig.req_param_names[:]
     req_param_names.remove('command')  # Allow defaults to work; this will be modified later.
     
@@ -2297,45 +2343,54 @@ class RedhawkProcessConfig(ProcessConfig):
             self.stderr_logfile = os.path.join(logdir, "%s.%s.stderr.log" % (self.DOMAIN_NAME, self.name))
             self.stdout_logfile = os.path.join(logdir, "%s.%s.stdout.log" % (self.DOMAIN_NAME, self.name))
 
+        redirect = ''
+        if hasattr(self, 'logfile'):
+            redirect = ">>%s%s" % ('' if self.redirect_stderr else '', self.logfile)
+        else:
+            redirect = ">>%s%s" % ('' if self.redirect_stderr else '', self.stdout_logfile)
+        if self.redirect_stderr:
+            redirect = redirect + " 2>&1"
+        else:
+            redirect = "%s 2>> %s" % (redirect, self.stderr_logfile)
+        self.output_redirect = redirect
+
     def get_start_command(self, addPid=True):
         cmd = self.command
 
         if self.run_detached:
             cgroup = ("cgexec " + self.cgroup) if self.cgroup is not None else ''
-            
+
             nice = ("/bin/nice " + self.nicelevel) if self.nicelevel is not None else ''
-    
+
             ulimit = ''
             if self.ulimit is not None:
                 ulimit = "ulimit %s %s >/dev/null 2>&1;" % (self.ulimit, ('-c ' + self.corefiles) if self.corefiles is not None else '')
             elif self.corefiles is not None:
                 ulimit = "ulimit -c %s >/dev/null 2>&1;" % self.corefiles
-    
+
             numactl = ("numactl " + self.affinity) if self.affinity is not None else ''
-            
+
             start_cmd_option = self.start_cmd_option if self.start_cmd_option is not None else ''
-            
-            if hasattr(self, 'logfile'):
-                redirect = ">>%s%s" % ('' if self.redirect_stderr else '', self.logfile)
-            else:
-                redirect = ">>%s%s" % ('' if self.redirect_stderr else '', self.stdout_logfile)
-            if self.redirect_stderr:
-                redirect = redirect + " 2>&1"
-            else:
-                redirect = "%s 2>> %s" % (redirect, self.stderr_logfile)
-            
-            pre_script = (". %s %s;" % (self.start_pre_script, redirect)) if self.start_pre_script is not None else ''
-            
-            post_script = (";. %s %s" % (self.start_post_script, redirect)) if self.start_post_script is not None else ''
+
+            pre_script = ''
+            if self.start_pre_script is not None:
+                script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_pre_script) else '.', self.start_pre_script)
+                pre_script = ("%s %s;" % (script, self.output_redirect))
+
+            post_script = ''
+            if self.start_post_script is not None:
+                script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_post_script) else '.', self.start_post_script)
+                post_script = ("; %s %s" % (script, self.output_redirect))
             
             pid = " echo $! > %s" % self.pid_file if addPid and self.pid_file is not None else ''
             
-            cmd = '%s %s /bin/bash -c "%s %s %s %s %s %s & %s %s"' % (cgroup, nice, ulimit, pre_script, numactl, cmd, start_cmd_option, redirect, pid, post_script)
+            cmd = '%s %s /bin/bash -c "%s %s %s %s %s %s & %s %s"' % (cgroup, nice, ulimit, pre_script, numactl, cmd, start_cmd_option, self.output_redirect, pid, post_script)
 
         self.options.logger.blather("%s start command is:\n%s" % (self.name, cmd))
         return cmd
 
 class DomainConfig(RedhawkProcessConfig):
+    config_type = 'domain'
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
     add_req_param_names.extend([
         'DMD_FILE'
@@ -2380,6 +2435,7 @@ class DomainConfig(RedhawkProcessConfig):
         self.lock_file = os.path.join(self.options.childlockdir, 'domain-mgrs', "%s.lock" % self.DOMAIN_NAME)
 
 class NodeConfig(RedhawkProcessConfig):
+    config_type = 'node'
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
 
     optional_command_line_param_names = RedhawkProcessConfig.optional_command_line_param_names[:]
@@ -2426,6 +2482,7 @@ class NodeConfig(RedhawkProcessConfig):
         self.lock_file = os.path.join(self.options.childlockdir, 'device-mgrs', "%s.%s.lock" % (self.DOMAIN_NAME, self.name))
 
 class WaveformConfig(RedhawkProcessConfig):
+    config_type = 'waveform'
     add_req_param_names = RedhawkProcessConfig.add_req_param_names[:]
     add_req_param_names.extend([
         'WAVEFORM'
@@ -2483,6 +2540,7 @@ class WaveformConfig(RedhawkProcessConfig):
         return False
 
 class EventListenerConfig(ProcessConfig):
+    config_type = 'event'
     req_param_names = ProcessConfig.req_param_names[:]
 
     def make_dispatchers(self, proc):
@@ -2507,6 +2565,7 @@ class EventListenerConfig(ProcessConfig):
         return dispatchers, p
 
 class FastCGIProcessConfig(ProcessConfig):
+    config_type = 'fastcgi'
     req_param_names = ProcessConfig.req_param_names[:]
 
     def make_process(self, group=None):
@@ -2528,6 +2587,7 @@ class FastCGIProcessConfig(ProcessConfig):
         return dispatchers, p
 
 class ProcessGroupConfig(Config):
+    config_type = 'group'
     def __init__(self, options, name, priority, enabled, process_configs):
         self.options = options
         self.name = name
@@ -2557,6 +2617,7 @@ class ProcessGroupConfig(Config):
         return ProcessGroup(self)
 
 class EventListenerPoolConfig(Config):
+    config_type = 'event-pool'
     def __init__(self, options, name, priority, enabled, process_configs, buffer_size,
                  pool_events, result_handler):
         self.options = options
@@ -2591,6 +2652,7 @@ class EventListenerPoolConfig(Config):
         return EventListenerPool(self)
 
 class FastCGIGroupConfig(ProcessGroupConfig):
+    config_type = 'fastcgi-group'
     def __init__(self, options, name, priority, enabled, process_configs, socket_config):
         ProcessGroupConfig.__init__(
             self,

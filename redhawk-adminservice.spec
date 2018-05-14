@@ -86,6 +86,7 @@ REDHAWK Admin Service
 rm -rf $RPM_BUILD_ROOT
 %{__python} setup.py install --skip-build -O1 --home=%{_prefix} --root=%{buildroot}
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/domains.d
+install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/extras.d
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/nodes.d
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/waveforms.d
@@ -105,7 +106,7 @@ install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/waveforms
 %{__mkdir_p} $RPM_BUILD_ROOT%{_unitdir}
 %{__cp} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d/redhawk-adminservice.service $RPM_BUILD_ROOT%{_unitdir}
 %endif
-echo "ENABLED" > $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/rh.cond.cfg
+echo "ENABLED=1" > $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/rh.cond.cfg
 
 
 %clean
@@ -119,9 +120,10 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/echo_adminserviced_conf
 %{_bindir}/pidproxy
 %{_bindir}/rhadmin
-%config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/adminserviced.conf
+%config %attr(660,root,redhawk) %{_sysconfdir}/redhawk/adminserviced.conf
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/rh.cond.cfg
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/domains.d
+%dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/extras.d
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/nodes.d
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/waveforms.d
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/init.d

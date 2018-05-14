@@ -424,30 +424,31 @@ class Subprocess:
 
         # We want to leave the processes up if they have pid_files and
         # admin service is shutting down, otherwise run the stop scripts
-        # 
         shutting_down = (self.config.options.mood < AdminServiceStates.RUNNING)
-        if not shutting_down or not self.config.run_detached:
-            self.run_script(self.config.stop_pre_script)
+        if (not shutting_down and self.config.run_detached) or not self.config.run_detached:
+            if self.config.stop_pre_script is not None:
+                script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.config.stop_pre_script) else '.', self.config.stop_pre_script)
+                pre_script = ('%s %s' % (script, self.config.output_redirect))
+                self.run_script(pre_script)
+
                     
         killval = self.kill(self.config.stopsignal, shutting_down)
 
-        if not shutting_down or not self.config.run_detached:
+        if (not shutting_down and self.config.run_detached) or not self.config.run_detached:
             self.config.alive = False
-            self.run_script(self.config.stop_post_script)
+            if self.config.stop_post_script is not None:
+                script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.config.stop_post_script) else '', self.config.stop_post_script)
+                post_script = ('%s %s' % (script, self.config.output_redirect))
+                self.run_script(post_script)
 
         return killval
 
     def run_script(self, script_to_run):
         if script_to_run is not None:
-            pre_files = [script_to_run]
-            if os.path.isdir(script_to_run):
-                pre_files = os.listdir(script_to_run)
             try:
-                for script in pre_files:
-                    if os.path.exists(script):
-                        subprocess.call(["/bin/bash", script])
+                os.system(script_to_run)
             except OSError, e:
-                self.config.options.write(2, "adminservice: unable to execute script(s) %s: %s\n" % (pre_files, repr(e)))
+                self.config.options.write(2, "adminservice: unable to execute script(s) %s: %s\n" % (script_to_run, repr(e)))
             except:
                 (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
                 error = '%s, %s: file: %s line: %s' % (t, v, fil, line)

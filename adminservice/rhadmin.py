@@ -603,7 +603,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def help_exit(self):
         self.ctl.output("exit\tExit the adminservice shell.")
 
-    def _show_statuses(self, process_infos):
+    def _show_statuses(self, process_infos, proc_type):
         namespecs, maxlen = [], 30
         for i, info in enumerate(process_infos):
             namespecs.append(make_namespec(info['group'], info['name']))
@@ -612,6 +612,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         template = '%(namespec)-' + str(maxlen+3) + 's%(state)-10s%(desc)s'
         for i, info in enumerate(process_infos):
+            if proc_type and not proc_type.startswith(info['config_type']):
+                continue
             line = template % {'namespec': namespecs[i],
                                'state': info['statename'],
                                'desc': info['description']}
@@ -624,8 +626,13 @@ class DefaultControllerPlugin(ControllerPluginBase):
         adminservice = self.ctl.get_adminservice()
         all_infos = adminservice.getAllProcessInfo()
 
+        type_to_status = ''
         names = arg.split()
-        if not names or "all" in names:
+        namelen = len(names)
+        if namelen > 0 and names[0] in ['domain', 'nodes', 'waveforms', 'process']:
+            type_to_status = names[0]
+            names.remove(type_to_status)
+        if namelen == 0 or "all" in names:
             matching_infos = all_infos
         else:
             matching_infos = []
@@ -649,15 +656,17 @@ class DefaultControllerPlugin(ControllerPluginBase):
                     else:
                         msg = "%s: ERROR (no such process)" % name
                     self.ctl.output(msg)
-        self._show_statuses(matching_infos)
+        self._show_statuses(matching_infos, type_to_status)
 
     def help_status(self):
         self.ctl.output("status <name>\t\tGet status for a single process")
-        self.ctl.output("status <gname>:*\tGet status for all "
-                        "processes in a group")
-        self.ctl.output("status <name> <name>\tGet status for multiple named "
-                        "processes")
+        self.ctl.output("status <gname>:*\tGet status for all processes in a group")
+        self.ctl.output("status <type> <gname>\t\tGet status for all processes of "
+                        "<type> in a group where type is 'domain', 'nodes' or 'waveforms'")
+        self.ctl.output("status <name> <name>\tGet status for multiple named processes")
         self.ctl.output("status\t\t\tGet all process status info")
+        self.ctl.output("status <type> all\t\tGet status for all processes of <type> "
+                        "where type is 'domain', 'nodes' or 'waveforms'")
 
     def do_pid(self, arg):
         adminservice = self.ctl.get_adminservice()
@@ -680,10 +689,14 @@ class DefaultControllerPlugin(ControllerPluginBase):
                     else:
                         raise
                 else:
-                    infos.extend(info)
+                    infos.append(info)
         self._show_pids(infos)
                     
     def _show_pids(self, process_infos):
+        if len(process_infos) == 1:
+            self.ctl.output('%s' % process_infos[0]['pid'])
+            return
+
         namespecs, maxlen = [], 30
         for i, info in enumerate(process_infos):
             namespecs.append(make_namespec(info['group'], info['name']))
@@ -741,11 +754,15 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return
 
         force = 'False'
+        type_to_start = ''
         if '-f' in names:
             force = 'True'
             names.remove('-f')
+        if names[0] in ['domain', 'nodes', 'waveforms', 'process']:
+            type_to_start = names[0]
+            names.remove(type_to_start)
         if 'all' in names:
-            results = adminservice.startAllProcesses()
+            results = adminservice.startAllProcesses(type_to_start)
             for result in results:
                 result = self._startresult(result)
                 self.ctl.output(result)
@@ -755,7 +772,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 group_name, process_name = split_namespec(name)
                 if process_name is None:
                     try:
-                        results = adminservice.startProcessGroup(group_name, force)
+                        results = adminservice.startProcessGroup(group_name, force, type_to_start)
                         for result in results:
                             result = self._startresult(result)
                             self.ctl.output(result)
@@ -790,9 +807,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def help_start(self):
         self.ctl.output("start <name>\t\tStart a process")
         self.ctl.output("start <gname>:*\t\tStart all processes in a group")
-        self.ctl.output(
-            "start <name> <name>\tStart multiple processes or groups")
+        self.ctl.output("start <type> <gname>\t\tStart all processes of <type> "
+                        "in a group where type is 'domain', 'nodes' or 'waveforms'")
+        self.ctl.output("start <name> <name>\tStart multiple processes or groups")
         self.ctl.output("start all\t\tStart all processes")
+        self.ctl.output("start <type> all\t\tStart all processes of <type> "
+                        "where type is 'domain', 'nodes' or 'waveforms'")
 
     def _signalresult(self, result, success='signalled'):
         name = make_namespec(result['group'], result['name'])
@@ -827,8 +847,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
             self.help_stop()
             return
 
+        type_to_stop = ''
+        if names[0] in ['domain', 'nodes', 'waveforms', 'process']:
+            type_to_stop = names[0]
+            names.remove(type_to_stop)
         if 'all' in names:
-            results = adminservice.stopAllProcesses()
+            results = adminservice.stopAllProcesses(type_to_stop)
             for result in results:
                 result = self._stopresult(result)
                 self.ctl.output(result)
@@ -838,7 +862,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 group_name, process_name = split_namespec(name)
                 if process_name is None:
                     try:
-                        results = adminservice.stopProcessGroup(group_name)
+                        results = adminservice.stopProcessGroup(group_name, type_to_stop)
                         for result in results:
                             result = self._stopresult(result)
                             self.ctl.output(result)
@@ -864,8 +888,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def help_stop(self):
         self.ctl.output("stop <name>\t\tStop a process")
         self.ctl.output("stop <gname>:*\t\tStop all processes in a group")
+        self.ctl.output("stop <type> <gname>\t\tStop all processes of <type> "
+                        "in a group where type is 'domain', 'nodes' or 'waveforms'")
         self.ctl.output("stop <name> <name>\tStop multiple processes or groups")
         self.ctl.output("stop all\t\tStop all processes")
+        self.ctl.output("stop <type> all\t\tStop all processes of <type> "
+                        "where type is 'domain', 'nodes' or 'waveforms'")
 
     def do_signal(self, arg):
         if not self.ctl.upcheck():
@@ -941,9 +969,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def help_restart(self):
         self.ctl.output("restart <name>\t\tRestart a process")
         self.ctl.output("restart <gname>:*\tRestart all processes in a group")
-        self.ctl.output("restart <name> <name>\tRestart multiple processes or "
-                     "groups")
+        self.ctl.output("restart <type> <gname>\t\tRestart all processes of <type> "
+                        "in a group where type is 'domain', 'nodes' or 'waveforms'")
+        self.ctl.output("restart <name> <name>\tRestart multiple processes or groups")
         self.ctl.output("restart all\t\tRestart all processes")
+        self.ctl.output("restart <type> all\t\tRestart all processes of <type> "
+                        "where type is 'domain', 'nodes' or 'waveforms'")
         self.ctl.output("Note: restart does not reread config files. For that,"
                         " see reread and update.")
 
@@ -1072,9 +1103,14 @@ class DefaultControllerPlugin(ControllerPluginBase):
             self.help_getconfig()
             return
 
+        args = arg.split(' ')
+        
+        configproc = args[0]
+        desiredconfigs = args[1] if len(args) > 1 else None
+
         adminservice = self.ctl.get_adminservice()
         try:
-            configinfo = adminservice.getConfigInfo(True, arg)
+            configinfo = adminservice.getConfigInfo(True, configproc)
         except xmlrpclib.Fault, e:
             if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                 self.ctl.output('ERROR: adminservice shutting down')
@@ -1083,11 +1119,15 @@ class DefaultControllerPlugin(ControllerPluginBase):
         else:
             configinfo = sorted(configinfo, key=itemgetter('group', 'name'))
             for pinfo in configinfo:
-                self.ctl.output("%s Configuration:" % arg)
+                if not desiredconfigs: 
+                    self.ctl.output("%s Configuration:" % configproc)
                 cfgs = [(key[7:],val) for (key, val) in pinfo.items() if key.startswith("config_")]
                 cfgs.sort()
                 for key,val in cfgs:
-                    self.ctl.output('\t%-32s %s' % (key,val))
+                    if not desiredconfigs:
+                        self.ctl.output('\t%-32s %s' % (key,val))
+                    elif key in desiredconfigs:
+                        self.ctl.output(val)
 
 
     def help_getconfig(self):
@@ -1229,6 +1269,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         # Loop through all the groups that we've changed in the order that we changed them
         for gname in changed:
+            if not waitfor.has_key(gname):
+                continue
             procs = waitfor[gname]
             if procs is not None:
                 # Loop through each process and get its status
