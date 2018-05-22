@@ -16,7 +16,7 @@ from adminservice.states import getProcessStateDescription
 from adminservice.states import ALL_STOPPED_STATES
 from adminservice.states import STOPPED_STATES
 
-from adminservice.options import decode_wait_status
+from adminservice.options import decode_wait_status, make_namespec
 from adminservice.options import signame
 from adminservice.options import ProcessException, BadCommand
 
@@ -454,6 +454,28 @@ class Subprocess:
                 error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
                 msg = "adminservice: couldn't run script at %s: %s\n" % (script_to_run, error)
                 self.config.options.write(2, msg)
+
+    def query(self):
+        if self.config.query_script is not None:
+            try:
+                shell = False if os.path.isdir(self.config.query_script) else True
+                args = ['/usr/bin/run-parts'] if not shell else []
+                args.extend([self.config.query_script])
+
+                # send in preexec_fn to change user to uid/gid
+                proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell, preexec_fn=self.set_uid)
+                comm = proc.communicate()
+                return "%s%s" % (comm[0], comm[1] if comm[1] is not None else '')
+            except OSError, e:
+                self.config.options.write(2, "adminservice: unable to execute query(s) %s: %s\n" % (self.config.query_script, repr(e)))
+            except:
+                (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
+                error = '%s, %s: file: %s line: %s' % (t, v, fil, line)
+                msg = "adminservice: couldn't run query at %s: %s\n" % (self.config.query_script, error)
+                self.config.options.write(2, msg)
+            return "Error running query"
+        else:
+            return "%s is in the %s state" % (make_namespec(self.config.group, self.config.name), getProcessStateDescription(self.get_state()))
 
     def stop_report(self):
         """ Log a 'waiting for x to stop' message with throttling. """

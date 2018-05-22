@@ -1049,6 +1049,7 @@ class ServerOptions(Options):
         start_post_script = get(section, 'start_post_script', None if default_klass is None else default_klass.start_post_script)
         started_status_script = get(section, 'started_status_script', None if default_klass is None else default_klass.started_status_script)
         status_script = get(section, 'status_script', None if default_klass is None else default_klass.status_script)
+        query_script = get(section, 'query_script', None if default_klass is None else default_klass.query_script)
         stop_pre_script = get(section, 'stop_pre_script', None if default_klass is None else default_klass.stop_pre_script)
         stop_post_script = get(section, 'stop_post_script', None if default_klass is None else default_klass.stop_post_script)
         start_cmd_option = get(section, 'start_cmd_option', None if default_klass is None else default_klass.start_cmd_option)
@@ -1214,6 +1215,7 @@ class ServerOptions(Options):
             start_post_script=start_post_script,
             started_status_script=started_status_script,
             status_script=status_script,
+            query_script=query_script,
             stop_pre_script=stop_pre_script,
             stop_post_script=stop_post_script,
             start_cmd_option=start_cmd_option,
@@ -2069,7 +2071,7 @@ class ProcessConfig(Config):
         'environment', 'conditional_config', 'serverurl', 'waitforprevious', 'failafterwait',
         'nicelevel', 'affinity', 'ulimit', 'corefiles', 'cgroup', 'permissions_start_only',
         'start_pre_script', 'start_post_script', 'stop_pre_script', 'stop_post_script',
-        'started_status_script', 'status_script', 
+        'started_status_script', 'status_script', 'query_script',
         'start_cmd_option', 'status_cmd_option', 'stop_cmd_option',
         ]
 

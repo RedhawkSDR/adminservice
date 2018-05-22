@@ -1359,6 +1359,68 @@ class DefaultControllerPlugin(ControllerPluginBase):
             "clear <name> <name>\tClear multiple process' log files")
         self.ctl.output("clear all\t\tClear all process' log files")
 
+    def _queryresult(self, result):
+        name = make_namespec(result['group'], result['name'])
+        output = result['output'] if result.has_key('output') else result['description']
+        template = '%s: %s\n'
+        return template % (name, output)
+
+    def do_query(self, arg):
+        if not self.ctl.upcheck():
+            return
+
+        names = arg.split()
+        adminservice = self.ctl.get_adminservice()
+
+        if not names:
+            self.ctl.output("Error: query requires a process name")
+            self.help_start()
+            return
+
+        type_to_query = ''
+        if names[0] in ['domain', 'nodes', 'waveforms', 'process']:
+            type_to_query = names[0]
+            names.remove(type_to_query)
+        if 'all' in names:
+            results = adminservice.queryAllProcesses(type_to_query)
+            for result in results:
+                result = self._queryresult(result)
+                self.ctl.output(result)
+
+        else:
+            for name in names:
+                group_name, process_name = split_namespec(name)
+                if process_name is None:
+                    try:
+                        results = adminservice.queryProcessGroup(group_name, type_to_query)
+                        for result in results:
+                            self.ctl.output(result['output'])
+                    except xmlrpclib.Fault, e:
+                        if e.faultCode == xmlrpc.Faults.BAD_NAME:
+                            error = "%s: ERROR (no such group)" % group_name
+                            self.ctl.output(error)
+                        else:
+                            raise
+                else:
+                    try:
+                        result = adminservice.queryProcess(name)
+                        self.ctl.output(result)
+                    except xmlrpclib.Fault, e:
+                        error = self._queryresult({'name': process_name,
+                                                   'group': group_name,
+                                                   'description': e.faultString})
+                        self.ctl.output(error)
+
+    def help_query(self):
+        self.ctl.output("query <name>\t\tQuery a process")
+        self.ctl.output("query <gname>:*\t\tQuery all processes in a group")
+        self.ctl.output("query <type> <gname>\t\tQuery all processes of <type> "
+                        "in a group where type is 'domain', 'nodes' or 'waveforms'")
+        self.ctl.output("query <name> <name>\tQuery multiple processes or groups")
+        self.ctl.output("query all\t\tQuery all processes")
+        self.ctl.output("query <type> all\t\tQuery all processes of <type> "
+                        "where type is 'domain', 'nodes' or 'waveforms'")
+
     def do_open(self, arg):
         url = arg.strip()
         parts = urlparse.urlparse(url)

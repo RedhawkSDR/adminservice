@@ -604,6 +604,64 @@ class AdminServiceNamespaceRPCInterface:
         self._update('signalAllProcesses')
         return result
 
+    def queryProcess(self, name, proc_type=''):
+        """ Start a process
+
+        @param string name Process name (or ``group:name``, or ``group:*``)
+        @param string proc_type Optionally the [domain, nodes, waveforms] type of process to query
+        @return boolean result     Always true unless error
+
+        """
+        self._update('queryProcess')
+        group, process = self._getGroupAndProcess(name)
+        if process is None:
+            group_name, process_name = split_namespec(name)
+            return self.queryProcessGroup(group_name)
+
+        if process.config.query_script is not None:
+            output = process.query()
+        else:
+            output = "%s is in the %s state" % (name, getProcessStateDescription(process.get_state()))
+
+        return output
+
+    def queryProcessGroup(self, name, proc_type):
+        """ Query all processes in the group named 'name'
+
+        @param string name      The group name
+        @param string proc_type Optionally the [domain, nodes, waveforms] type of process to query
+        @return array result    An array of process status info structs
+        """
+        self._update('queryProcessGroup')
+
+        group = self.adminserviced.process_groups.get(name)
+
+        if group is None:
+            raise RPCError(Faults.BAD_NAME, name)
+
+        processes = group.processes.values()
+        processes.sort()
+        processes = [ (group, process) for process in processes]
+
+        queryall = make_allfunc(processes, alwaysTrue, self.queryProcess, proc_type=proc_type)
+
+        return queryall()
+
+    def queryAllProcesses(self, proc_type=''):
+        """ Query all processes listed in the configuration file
+
+        @param string proc_type Optionally the [domain, nodes, waveforms] type of process to query
+        @return array result    An array of process query outputs
+        """
+        self._update('queryAllProcesses')
+
+        processes = self._getAllProcesses()
+        queryall = make_allfunc(processes, alwaysTrue, self.queryProcess, proc_type=proc_type)
+
+        queryall.delay = 0.05
+        queryall.rpcinterface = self
+        return queryall # deferred
+
     def getAllConfigInfo(self, full=False):
         """ Get info about all available process configurations. Each struct
         represents a single process (i.e. groups get flattened).
@@ -1008,12 +1066,13 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
                     if isinstance(callback, types.FunctionType):
                         callbacks.append((group, process, callback))
                     else:
-                        results.append(
-                            {'name':process.config.name,
+                        ret = {'name':process.config.name,
                              'group':group.config.name,
                              'status':Faults.SUCCESS,
                              'description':'OK'}
-                            )
+                        if isinstance(callback, basestring):
+                            ret['output'] = callback
+                        results.append(ret)
 
         if not callbacks:
             return results
@@ -1204,6 +1263,9 @@ def wait_transition(last_state, last_proc, new_proc):
 
     new_proc.config.options.logger.debug("Not waiting anymore-- wait: %s  last_state: %s  new_state: %s" % (new_proc.config.waitforprevious, last_state, new_proc.get_state()))
     return False
+
+def alwaysTrue(var):
+    return True
 
 def isRunning(process):
     if process.get_state() in RUNNING_STATES:
