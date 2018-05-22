@@ -1,4 +1,5 @@
 import errno
+import os
 from adminservice.medusa.asyncore_25 import compact_traceback
 
 from adminservice.events import notify
@@ -122,6 +123,11 @@ class POutputDispatcher(PDispatcher):
         self.log_to_mainlog = config.options.loglevel <= self.mainlog_level
         self.stdout_events_enabled = config.stdout_events_enabled
         self.stderr_events_enabled = config.stderr_events_enabled
+        if logfile != 'syslog':
+            uid = getattr(config, 'uid', None)
+            gid = getattr(config, 'gid', None)
+            if uid is not None and gid is not None:
+                os.chown(logfile, uid, gid)
 
     def removelogs(self):
         for log in (self.mainlog, self.capturelog):

@@ -1102,7 +1102,7 @@ class ServerOptions(Options):
         group = get(section, 'group', None)
         if group is None:
             if default_klass is None:
-                gid = None
+                gid = gid_for_uid(uid) if uid is not None else None
             else:
                 gid = default_klass.gid if default_klass.gid is not None else gid_for_uid(uid) if uid is not None else None
         else:
@@ -2180,7 +2180,7 @@ class ProcessConfig(Config):
             
             pid = (" echo $! > %s" % self.pid_file) if self.pid_file is not None else ''
             
-            cmd = '/bin/bash -c "%s %s %s & %s %s"' % (pre_script, cmd, self.output_redirect, pid, post_script)
+            cmd = "/bin/bash -c '%s %s %s & %s %s'" % (pre_script, cmd, self.output_redirect, pid, post_script)
         return cmd
 
     def get_stop_command(self):
@@ -2204,9 +2204,8 @@ class ProcessConfig(Config):
                 self.alive = False
                 return False
             else:
-                os.kill(integer(pid), 0) # does nothing if pid exists, throws OSError if not
-                self.alive = True
-                return True
+                self.alive = os.path.exists("/proc/%s" % pid) # does nothing if pid exists, throws OSError if not
+                return self.alive
         except OSError:
             self.alive = False
         except:
@@ -2384,7 +2383,7 @@ class RedhawkProcessConfig(ProcessConfig):
             
             pid = " echo $! > %s" % self.pid_file if addPid and self.pid_file is not None else ''
             
-            cmd = '%s %s /bin/bash -c "%s %s %s %s %s %s & %s %s"' % (cgroup, nice, ulimit, pre_script, numactl, cmd, start_cmd_option, self.output_redirect, pid, post_script)
+            cmd = "%s %s /bin/bash -c '%s %s %s %s %s %s & %s %s'" % (cgroup, nice, ulimit, pre_script, numactl, cmd, start_cmd_option, self.output_redirect, pid, post_script)
 
         self.options.logger.blather("%s start command is:\n%s" % (self.name, cmd))
         return cmd
