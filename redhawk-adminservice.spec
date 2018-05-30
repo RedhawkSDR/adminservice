@@ -90,7 +90,6 @@ install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/extras.d
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/nodes.d
 install -d -m 0775 $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/waveforms.d
-install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/lock/redhawk
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/device-mgrs
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/domain-mgrs
@@ -117,6 +116,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %{_bindir}/adminserviced
 %{_bindir}/adminserviced-start
+%{_bindir}/adminserviced-stop
 %{_bindir}/echo_adminserviced_conf
 %{_bindir}/pidproxy
 %{_bindir}/rhadmin
@@ -127,6 +127,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/nodes.d
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/waveforms.d
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/init.d
+%config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/adminserviced.defaults
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/domain.defaults
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/node.defaults
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/waveform.defaults
@@ -143,7 +144,6 @@ rm -rf $RPM_BUILD_ROOT
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/security/limits.d/99-redhawk-limits.conf
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/sysctl.d
 %attr(664,root,redhawk) %{_sysconfdir}/redhawk/sysctl.d/sysctl.conf
-%dir %attr(775,root,redhawk) %{_localstatedir}/lock/redhawk
 %dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk
 %dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/device-mgrs
 %dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/domain-mgrs

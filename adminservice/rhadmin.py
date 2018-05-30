@@ -1074,10 +1074,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
         template = '%(name)-32s %(inuse)-9s %(autostart)-9s %(enabled)-9s %(priority)s'
         return template % formatted
 
-    def do_avail(self, arg):
+    def do_list(self, arg):
         if arg:
-            self.ctl.output('Error: avail accepts no arguments')
-            self.help_avail()
+            self.ctl.output('Error: list accepts no arguments')
+            self.help_list()
             return
 
         adminservice = self.ctl.get_adminservice()
@@ -1094,8 +1094,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
             for pinfo in configinfo:
                 self.ctl.output(self._formatConfigInfo(pinfo))
 
-    def help_avail(self):
-        self.ctl.output("avail\t\t\tDisplay all configured processes")
+    def help_list(self):
+        self.ctl.output("list\t\t\tDisplay all configured processes")
 
     def do_getconfig(self, arg):
         if not arg:

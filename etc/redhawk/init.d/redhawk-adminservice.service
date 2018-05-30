@@ -4,11 +4,12 @@ After=syslog.target
 
 [Service]
 Type=forking
-ExecStart=/usr/local/redhawk/core/bin/adminserviced-start -c /etc/redhawk/adminserviced.conf
-ExecStop=/usr/local/redhawk/core/bin/rhadmin shutdown
+ExecStart=/usr/local/redhawk/core/bin/adminserviced-start
+ExecStop=/usr/local/redhawk/core/bin/adminserviced-stop
 WorkingDirectory=/etc/redhawk
 TimeoutSec=20s
-KillMode=process
+KillMode=none
+PIDFile=/var/run/redhawk/adminserviced.pid
 
 [Install]
 WantedBy=multi-user.target

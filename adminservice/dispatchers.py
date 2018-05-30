@@ -123,7 +123,7 @@ class POutputDispatcher(PDispatcher):
         self.log_to_mainlog = config.options.loglevel <= self.mainlog_level
         self.stdout_events_enabled = config.stdout_events_enabled
         self.stderr_events_enabled = config.stderr_events_enabled
-        if logfile != 'syslog':
+        if logfile != 'syslog' and logfile is not None:
             uid = getattr(config, 'uid', None)
             gid = getattr(config, 'gid', None)
             if uid is not None and gid is not None:

@@ -104,23 +104,27 @@ class Options:
                        'etc/redhawk/adminserviced.conf',
                        '/etc/redhawk/adminserviced.conf',
                        ]
+        defaultssearchpaths = ['etc/redhawk/init.d/adminserviced.defaults',
+                       '/etc/redhawk/init.d/adminserviced.defaults',
+                       ]
         self.searchpaths = searchpaths
+        self.defaultssearchpaths = defaultssearchpaths
 
         self.environ_expansions = {}
         for k, v in os.environ.items():
             self.environ_expansions['ENV_%s' % k] = v
 
-    def default_configfile(self):
+    def default_configfile(self, searchpaths):
         """Return the name of the found config file or print usage/exit."""
         config = None
-        for path in self.searchpaths:
+        for path in searchpaths:
             if os.path.exists(path):
                 config = path
                 break
         if config is None and self.require_configfile:
             self.usage('No config file found at default paths (%s); '
                        'use the -c option to specify a config file '
-                       'at a different path' % ', '.join(self.searchpaths))
+                       'at a different path' % ', '.join(searchpaths))
         return config
     here = os.path.dirname(os.path.dirname(sys.argv[0]))
 
@@ -294,7 +298,7 @@ class Options:
                     self._set(name, value, 1)
 
         if self.configfile is None:
-            self.configfile = self.default_configfile()
+            self.configfile = self.default_configfile(self.defaultssearchpaths)
 
         self.process_config()
 
@@ -304,6 +308,7 @@ class Options:
         This includes reading config file if necessary, setting defaults etc.
         """
         if self.configfile:
+            self.process_default_config_file(do_usage)
             self.process_config_file(do_usage)
 
         # Copy config options to attributes of self.  This only fills
@@ -329,7 +334,7 @@ class Options:
             if getattr(self, name) is None:
                 self.usage(message)
 
-    def process_config_file(self, do_usage):
+    def process_default_config_file(self, do_usage):
         # Process config file
         if not hasattr(self.configfile, 'read'):
             self.here = os.path.abspath(os.path.dirname(self.configfile))
@@ -342,6 +347,67 @@ class Options:
             else:
                 # if this is called from an RPC method, raise an error
                 raise ValueError(msg)
+
+    def process_config_file(self, do_usage):
+        configfile = self.default_configfile(self.searchpaths)
+
+        # Process config file
+        if not hasattr(configfile, 'read'):
+            self.here = os.path.abspath(os.path.dirname(configfile))
+        try:
+            self.read_custom_config(configfile)
+        except ValueError, msg:
+            if do_usage:
+                # if this is not called from an RPC method, run usage and exit.
+                self.usage(str(msg))
+            else:
+                # if this is called from an RPC method, raise an error
+                raise ValueError(msg)
+
+    def read_custom_config(self, configfile):
+        if not hasattr(configfile, 'read'):
+            if not self.exists(configfile):
+                raise ValueError("could not find config file %s" % configfile)
+            try:
+                configfile = self.open(configfile, 'r')
+            except (IOError, OSError):
+                raise ValueError("could not read config file %s" % configfile)
+
+        parser = UnhosedConfigParser()
+        parser.expansions = self.environ_expansions
+        try:
+            parser.readfp(configfile)
+        except ConfigParser.ParsingError, why:
+            raise ValueError(str(why))
+
+        host_node_name = platform.node()
+        expansions = {'here':self.here,
+                      'host_node_name':host_node_name}
+        expansions.update(self.environ_expansions)
+
+        for sect in parser.sections():
+            if sect == 'rhadmin' and hasattr(self.configroot, 'rhadmin'):
+                # Check for 'officially supported' configuration items
+                for param in ['serverurl', 'username', 'password']:
+                    val = parser.saneget('rhadmin', param, None)
+                    if val is not None:
+                        setattr(self.configroot.rhadmin, param, val)
+            elif sect == 'unix_http_server' and hasattr(self.configroot, 'adminserviced'):
+                server = None
+                # Find the local socket definition
+                for serverconfig in self.configroot.adminserviced.server_configs:
+                    if serverconfig['section'] == 'unix_http_server':
+                        server = serverconfig
+                        break
+                # This shouldn't happen, the defaults file probably didn't exist. I wouldn't expect to make it this far in that case
+                if server is None:
+                    self.parse_warnings.append("'unix_http_server' configuration defined, but has no default configuration")
+                    continue
+                # Check for 'officially supported' configuration items
+                for param in ['file', 'username', 'password']:
+                    val = parser.saneget('unix_http_server', param, None)
+                    if val is not None:
+                        server[param] = val
 
     def exists(self, path):
         return os.path.exists(path)
@@ -428,8 +494,6 @@ class ServerOptions(Options):
                  existing_dirpath, default="adminserviced.pid")
         self.add("identifier", "adminserviced.identifier", "i:", "identifier=",
                  str, default="adminservice")
-        self.add("childlockdir", "adminserviced.childlockdir", "q:", "childlockdir=",
-                 existing_directory, default='/var/lock/redhawk')
         self.add("childlogdir", "adminserviced.childlogdir", "o:", "childlogdir=",
                  existing_directory, default='/var/log/redhawk')
         self.add("childpiddir", "adminserviced.childpiddir", "p:", "childpiddir=",
@@ -463,7 +527,7 @@ class ServerOptions(Options):
         return loggers.getLogger(filename, level, fmt, rotating, maxbytes,
                                  backups, stdout)
 
-    def default_configfile(self):
+    def default_configfile(self, searchpaths):
         if os.getuid() == 0:
             self.warnings.warn(
                 'adminserviced is running as root and it is searching '
@@ -473,7 +537,7 @@ class ServerOptions(Options):
                 'absolute path to a configuration file for improved '
                 'security.'
                 )
-        return Options.default_configfile(self)
+        return Options.default_configfile(self, searchpaths)
 
     def realize(self, *arg, **kw):
         Options.realize(self, *arg, **kw)
@@ -643,8 +707,8 @@ class ServerOptions(Options):
     def process_config(self, do_usage=True):
         Options.process_config(self, do_usage=do_usage)
 
-        new = self.configroot.adminserviced.process_group_configs
-        self.process_group_configs = new
+        newconfig = self.configroot.adminserviced.process_group_configs
+        self.process_group_configs = newconfig
         self.process_rh_defaults()
 
     def read_config(self, fp):
@@ -730,7 +794,6 @@ class ServerOptions(Options):
         section.identifier = get('identifier', 'adminservice')
         section.nodaemon = boolean(get('nodaemon', 'false'))
 
-        section.childlockdir = existing_directory(get('childlockdir', '/var/lock/redhawk'))
         section.childlogdir = existing_directory(get('childlogdir', '/var/log/redhawk'))
         section.childpiddir = existing_directory(get('childpiddir', '/var/run/redhawk'))
         section.nocleanup = boolean(get('nocleanup', 'false'))
@@ -2433,7 +2496,6 @@ class DomainConfig(RedhawkProcessConfig):
     def create_autochildlogs(self):
         self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'domain-mgrs')
         RedhawkProcessConfig.create_autochildlogs(self)
-        self.lock_file = os.path.join(self.options.childlockdir, 'domain-mgrs', "%s.lock" % self.DOMAIN_NAME)
 
 class NodeConfig(RedhawkProcessConfig):
     config_type = 'node'
@@ -2480,7 +2542,6 @@ class NodeConfig(RedhawkProcessConfig):
     def create_autochildlogs(self):
         self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'device-mgrs')
         RedhawkProcessConfig.create_autochildlogs(self)
-        self.lock_file = os.path.join(self.options.childlockdir, 'device-mgrs', "%s.%s.lock" % (self.DOMAIN_NAME, self.name))
 
 class WaveformConfig(RedhawkProcessConfig):
     config_type = 'waveform'
@@ -2511,7 +2572,6 @@ class WaveformConfig(RedhawkProcessConfig):
             if self.INSTANCE_NAME is not None:
                 wave_name += "." + self.INSTANCE_NAME
             self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'waveforms')
-            self.lock_file = os.path.join(self.options.childlockdir, 'waveforms', "%s.%s.lock" % (self.DOMAIN_NAME, wave_name))
             self.pid_file = os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name))
 
             self.command = self.command + " -d " + self.DOMAIN_NAME
