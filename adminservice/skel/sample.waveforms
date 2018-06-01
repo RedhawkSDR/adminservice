@@ -1,12 +1,10 @@
 [waveform:waveform1]
-command=/etc/redhawk/init.d/redhawk-wf-control ; required absolute path to the waveform control script
 DOMAIN_NAME=                                   ; required name of your domain - no default
 # One of the next two is required
 WAVEFORM=                                      ; required the name of the waveform(optionally namespaced) - no default
 
 INSTANCE_NAME=                                 ; optional name of the launched waveform
 
-SDRROOT=%(ENV_SDRROOT)s                        ; optional override SDRROOT - if blank uses $SDRROOT, fallback /var/redhawk/sdr
 OSSIEHOME=%(ENV_OSSIEHOME)s                    ; optional override OSSIEHOME - if blank uses $OSSIEHOME, fallback /usr/local/redhawk
 PYTHONPATH=%(ENV_OSSIEHOME)s/lib/python:%(ENV_PYTHONPATH)s ; optional set up PYTHONPATH before execution
 
@@ -23,14 +21,6 @@ directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running s
 priority=900                      ; optional the relative start priority (default 999)
 run_detached=True                 ; optional run this process as a daemon
 autostart=True                    ; optional start at adminserviced start (default: true)
-startsecs=10                      ; optional number of secs prog must stay up to be running (def. 1)
-startretries=0                    ; optional max number of serial start failures when starting (default 3)
-autorestart=False                 ; optional when to restart if exited after running (def: False)
-;exitcodes=0,2                    ; optional 'expected' exit codes used with autorestart (default 0,2)
-stopsignal=TERM                   ; optional signal used to kill process (default TERM)
-;stopwaitsecs=10                  ; optional max num secs to wait b4 SIGKILL (default 10)
-;stopasgroup=False                ; optional send stop signal to the UNIX process group (default false)
-;killasgroup=False                ; optional SIGKILL the UNIX process group (def false)
 ;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
 ;failafterwait=False              ; optional abort starting this group if the wait times out
 
@@ -46,6 +36,3 @@ stopsignal=TERM                   ; optional signal used to kill process (defaul
 ;started_status_script=           ; optional script to run to check if the process has started
 
 start_delay=30                    ; optional total time to try restarting waveform before declaring failure
-start_cmd_option=-o create        ; optional extra arguments required to make a valid start command
-status_cmd_option=-o status       ; optional extra arguments required to make a valid status command
-stop_cmd_option=-o remove         ; optional extra arguments required to make a valid stop command

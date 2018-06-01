@@ -1,5 +1,4 @@
 [node:node1]
-command=dev/mgr/DeviceManager           ; required relative path to the device manager - combined with SDRROOT
 DOMAIN_NAME=                            ; required name of your domain - no default
 SPD=/mgr/DeviceManager.spd.xml          ; required relative path to the DeviceManagers spd file
 DCD_FILE=                               ; optional relative path to the DCD file - uses NODE_NAME for path if blank
@@ -34,14 +33,6 @@ directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running s
 priority=400                      ; optional the relative start priority (default 999)
 run_detached=True                 ; optional run this process as a daemon
 autostart=True                    ; optional start at supervisord start (default: true)
-startsecs=10                      ; optional # of secs prog must stay up to be running (def. 1)
-startretries=0                    ; optional max # of serial start failures when starting (default 3)
-stopsignal=TERM                   ; optional signal used to kill process (default TERM)
-autorestart=False                 ; optional when to restart if exited after running (def: False)
-;exitcodes=0,2                    ; optional 'expected' exit codes used with autorestart (default 0,2)
-;stopwaitsecs=10                  ; optional max num secs to wait b4 SIGKILL (default 10)
-;stopasgroup=False                ; optional send stop signal to the UNIX process group (default false)
-;killasgroup=False                ; optional SIGKILL the UNIX process group (def false)
 ;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
 ;failafterwait=True               ; optional abort starting this group if the wait times out
 
