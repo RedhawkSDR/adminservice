@@ -1,0 +1,11 @@
+[Unit]
+Description=Redhawk AdminService /var/run directory setup
+After=syslog.target omniNames.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /usr/local/redhawk/core/bin/redhawk-adminservice-setup
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

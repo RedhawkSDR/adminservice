@@ -1175,8 +1175,10 @@ def daemonize(directory, umask, argv, env, stdin='/dev/null', stdout='/dev/null'
 
 
     # Decouple from parent environment.
-    os.chdir(directory) 
-    os.umask(integer(umask) if umask is not None else 0) 
+    if directory is not None:
+        os.chdir(directory)
+    if umask is not None:
+        os.umask(integer(umask))
     os.setsid() 
 
     # Do third fork.

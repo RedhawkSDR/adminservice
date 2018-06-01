@@ -25,6 +25,7 @@ actions.
 import cmd
 import errno
 import getpass
+import glob
 import xmlrpclib
 import socket
 import urlparse
@@ -1544,23 +1545,26 @@ class DefaultControllerPlugin(ControllerPluginBase):
         config = pkg_resources.resource_string(__name__, self.config_files[args[0]])
         if len(args) > 1:
             if 'node' == args[0]:
-                config = self.process_node_file(config, args)
+                config = self.process_node_file(args)
             elif 'domain' == args[0]:
-                config = self.process_domain_file(config, args)
+                config = self.process_domain_file(args)
             elif 'waveform' == args[0]:
-                config = self.process_waveform_file(config, args)
+                config = self.process_waveform_file(args)
                 
         return config
 
-    def process_domain_file(self, config, args):
+    def process_domain_file(self, args):
+        config = '[domain:domain1]\nDOMAIN_NAME= \n'
         dmdFile = args[1]
         docDmd = xml.dom.minidom.parse(dmdFile)
-        
-        iniFile = dmdFile.replace('.dmd.xml', '.ini')
-        if os.path.exists(iniFile):
-            iniContents = readFile(iniFile, 0, 0)
-            config = iniContents if len(iniContents) > 0 else config
-        
+
+        # Grab the first .ini file in the same directory as the dmd.xml
+        iniFiles = glob.glob(os.path.join(os.path.split(dmdFile)[0], '*.ini'))
+        if len(iniFiles) > 0:
+            iniContents = readFile(iniFiles[0], 0, 0)
+            if len(iniContents) > 0:
+                config = iniContents
+
         # Find the DMD associated with the domain
         domainName = docDmd.getElementsByTagName('domainmanagerconfiguration')[0].getAttribute('name')
 
@@ -1569,18 +1573,20 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         return config
 
-    def process_node_file(self, config, args):
+    def process_node_file(self, args):
+        config = '[node:node1]\nDOMAIN_NAME= \nNODE_NAME= \nDCD_FILE= \n'
         dcdFile = args[1]
         docDcd = xml.dom.minidom.parse(dcdFile)
         
-        iniFile = dcdFile.replace('.dcd.xml', '.ini')
-        if os.path.exists(iniFile):
-            iniContents = readFile(iniFile, 0, 0)
-            config = iniContents if len(iniContents) > 0 else config
+        # Grab the first .ini file in the same directory as the dcd.xml
+        iniFiles = glob.glob(os.path.join(os.path.split(dcdFile)[0], '*.ini'))
+        if len(iniFiles) > 0:
+            iniContents = readFile(iniFiles[0], 0, 0)
+            if len(iniContents) > 0:
+                config = iniContents
         
         # Find the DCD associated with the node
         nodeName = docDcd.getElementsByTagName('deviceconfiguration')[0].getAttribute('name')
-        nodeSpdFile = docDcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('devicemanagersoftpkg')[0].getElementsByTagName('localfile')[0].getAttribute('name')
         domainName = docDcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('domainmanager')[0].getElementsByTagName('namingservice')[0].getAttribute('name').split('/')[0]
         if len(args) == 3:
             domainName = args[2]
@@ -1589,18 +1595,20 @@ class DefaultControllerPlugin(ControllerPluginBase):
         config = re.sub(r"DOMAIN_NAME=.*?([;\n])", 'DOMAIN_NAME=%s \\1' % domainName, config)
         config = re.sub(r"NODE_NAME=.*?([;\n])", 'NODE_NAME=%s \\1' % nodeName, config)
         config = re.sub(r"DCD_FILE=.*?([;\n])", 'DCD_FILE=/nodes/%s/DeviceManager.dcd.xml \\1' % nodeName, config)
-        config = re.sub(r"SPD=.*?([;\n])", 'SPD=%s \\1' % nodeSpdFile, config)
 
         return config
 
-    def process_waveform_file(self, config, args):
+    def process_waveform_file(self, args):
+        config = '[waveform:waveform1]\nDOMAIN_NAME= \nWAVEFORM= \n'
         sadFile = args[1]
         docSad = xml.dom.minidom.parse(args[1])
         
-        iniFile = sadFile.replace('.sad.xml', '.ini')
-        if os.path.exists(iniFile):
-            iniContents = readFile(iniFile, 0, 0)
-            config = iniContents if len(iniContents) > 0 else config
+        # Grab the first .ini file in the same directory as the sad.xml
+        iniFiles = glob.glob(os.path.join(os.path.split(sadFile)[0], '*.ini'))
+        if len(iniFiles) > 0:
+            iniContents = readFile(iniFiles[0], 0, 0)
+            if len(iniContents) > 0:
+                config = iniContents
 
         # Find the SAD associated with the waveform
         waveformName = docSad.getElementsByTagName('softwareassembly')[0].getAttribute('name')

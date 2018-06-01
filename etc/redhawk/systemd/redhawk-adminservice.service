@@ -1,6 +1,6 @@
 [Unit]
 Description=Redhawk Admin Service
-After=syslog.target
+After=redhawk-adminservice-setup.service
 
 [Service]
 Type=forking

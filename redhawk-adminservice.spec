@@ -94,17 +94,21 @@ install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/device-mgrs
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/domain-mgrs
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/waveforms
-install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk
-install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/device-mgrs
-install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/domain-mgrs
-install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/waveforms
 %{__cp} -r etc $RPM_BUILD_ROOT/
 %{__mv} $RPM_BUILD_ROOT/%{_sysconfdir}/redhawk/cron.d $RPM_BUILD_ROOT/%{_sysconfdir}/cron.d
 %{__cp} -r bin/* $RPM_BUILD_ROOT/%{_bindir}
 %if 0%{?with_systemd}
 %{__mkdir_p} $RPM_BUILD_ROOT%{_unitdir}
-%{__cp} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/init.d/redhawk-adminservice.service $RPM_BUILD_ROOT%{_unitdir}
+%{__mv} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/systemd/redhawk-adminservice-setup $RPM_BUILD_ROOT%{_bindir}
+%{__mv} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/systemd/redhawk-adminservice.service $RPM_BUILD_ROOT%{_unitdir}
+%{__mv} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/systemd/redhawk-adminservice-setup.service $RPM_BUILD_ROOT%{_unitdir}
+%else
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/device-mgrs
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/domain-mgrs
+install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/waveforms
 %endif
+rm -r $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/systemd
 echo "ENABLED=1" > $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/rh.cond.cfg
 
 
@@ -132,7 +136,6 @@ rm -rf $RPM_BUILD_ROOT
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/node.defaults
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/waveform.defaults
 %attr(775,root,redhawk) %{_sysconfdir}/redhawk/init.d/redhawk-adminservice
-%attr(664,root,redhawk) %{_sysconfdir}/redhawk/init.d/redhawk-adminservice.service
 %attr(775,root,redhawk) %{_sysconfdir}/redhawk/init.d/redhawk-wf-control
 %attr(644,root,redhawk) %{_sysconfdir}/cron.d/redhawk
 %dir %attr(775,root,redhawk) %{_sysconfdir}/redhawk/logging
@@ -148,20 +151,24 @@ rm -rf $RPM_BUILD_ROOT
 %dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/device-mgrs
 %dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/domain-mgrs
 %dir %attr(775,root,redhawk) %{_localstatedir}/log/redhawk/waveforms
-%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk
-%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/device-mgrs
-%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/domain-mgrs
-%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/waveforms
 %{_prefix}/lib/python/adminservice
 %if 0%{?rhel} >= 6
 %{_prefix}/lib/python/adminservice-%{version}-py%{python_version}.egg-info
 %endif
 %if 0%{?with_systemd}
+%{_bindir}/redhawk-adminservice-setup
 %{_unitdir}/redhawk-adminservice.service
+%{_unitdir}/redhawk-adminservice-setup.service
+%else
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/device-mgrs
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/domain-mgrs
+%dir %attr(775,root,redhawk) %{_localstatedir}/run/redhawk/waveforms
 %endif
 
 %post
 %if 0%{?with_systemd}
+%systemd_post redhawk-adminservice-setup.service
 %systemd_post redhawk-adminservice.service
 
 systemctl reload crond > /dev/null 2>&1 || :
@@ -175,6 +182,7 @@ service crond reload > /dev/null 2>&1 || :
 %preun
 %if 0%{?with_systemd}
 %systemd_preun redhawk-adminservice.service
+%systemd_preun redhawk-adminservice-setup.service
 %else
 /sbin/service redhawk-adminservice stop > /dev/null 2>&1 || :
 /sbin/chkconfig --del redhawk-adminservice  > /dev/null 2>&1 || :
@@ -183,6 +191,7 @@ service crond reload > /dev/null 2>&1 || :
 %postun
 %if 0%{?with_systemd}
 %systemd_postun_with_restart redhawk-adminservice.service
+%systemd_postun_with_restart redhawk-adminservice-setup.service
 
 systemctl reload crond  > /dev/null 2>&1 || :
 %else

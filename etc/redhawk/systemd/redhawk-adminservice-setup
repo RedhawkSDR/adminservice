@@ -1,0 +1,7 @@
+#!/bin/bash
+
+umask 002
+mkdir -p /var/run/redhawk/{device-mgrs,domain-mgrs,waveforms}
+chown redhawk:redhawk /var/run/redhawk
+chown redhawk:redhawk /var/run/redhawk/{device-mgrs,domain-mgrs,waveforms}
+
