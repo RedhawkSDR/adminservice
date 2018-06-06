@@ -287,7 +287,7 @@ def getDomainManager(domainName, delay=0):
         return domain
     except Exception, e:
         try:
-            print >> sys.stderr, "ERROR: Failed to connect to Domain Manager. %s" % e.msg
+            print >> sys.stderr, "ERROR: Failed to connect to Domain Manager. %s" % e.message
         except:
             print >> sys.stderr, "ERROR: Failed to connect to Domain Manager. %s" % str(e)
         sys.exit(1)
@@ -339,10 +339,10 @@ def createWaveform(dom, opts):
             try:
                 print "Calling create with waveform ID: %s" % instanceName
                 app = appFact.create(instanceName,[],[])
-                opts.instanceName = app.name
+                opts.instanceName = app._get_name()
                 break
             except Exception, e:
-                print >>sys.stderr, "ERROR:: Failed to launch waveform %s with error %s" % (instanceName, e.msg)
+                print >>sys.stderr, "ERROR:: Failed to launch waveform %s with error %s" % (instanceName, e.message)
                 if time.time() > end_time:
                     raise e
                 time.sleep(1)
@@ -353,7 +353,7 @@ def createWaveform(dom, opts):
         try:
             app.start()
         except Exception, e:
-            print >>sys.stderr, "ERROR:: Failed to start waveform %s with error %s" % (instanceName, e.msg)
+            print >>sys.stderr, "ERROR:: Failed to start waveform %s with error %s" % (instanceName, e.message)
             raise
         except:
             print >>sys.stderr, "ERROR:: Failed to start waveform %s" % instanceName
@@ -363,7 +363,7 @@ def createWaveform(dom, opts):
             if app:
                 app.releaseObject()
         except Exception, e:
-            print >>sys.stderr, "ERROR:: Failed to release waveform %s with error %s" % (instanceName, e.msg)
+            print >>sys.stderr, "ERROR:: Failed to release waveform %s with error %s" % (instanceName, e.message)
         except:
             print >>sys.stderr, "ERROR:: Failed to release waveform %s" % instanceName
         sys.exit(1)
@@ -380,7 +380,7 @@ def getAppFactory(dom, waveURI):
                 return entry
     except Exception, e:
         print >>sys.stderr, \
-                "ERROR finding Application Factory: Failed with exception %s" % e.msg
+                "ERROR finding Application Factory: Failed with exception %s" % e.message
         return None
 
 def saveToPidFile(opts, waveformID):
@@ -474,12 +474,12 @@ def showStatus(dom, opts):
             found = True
         if not found:
             for app in dom.apps:
-                if searchName and app.name.startswith(searchName):
+                if searchName and app._get_name().startswith(searchName):
                     running = displayWaveformStatus(opts, app, searchName) 
                     found = True
             if not found and waveformName is not None:
                 for app in dom.apps:
-                    if waveformName and app.name.startswith(waveformName):
+                    if waveformName and app._get_name().startswith(waveformName):
                         running = displayWaveformStatus(opts, app, waveformName) 
                         found = True
     
@@ -494,7 +494,7 @@ def listAllAvailableWaveforms(dom):
 
     waveforms = ""
     for app in dom.apps: 
-        waveforms += "\t" + app.name + " " + app._get_identifier() + "\n"
+        waveforms += "\t" + app._get_name() + " " + app._get_identifier() + "\n"
 
     if waveforms == "": 
         waveforms = "\tNone Found"
@@ -509,7 +509,7 @@ def displayWaveformStatus(opts, waveform, waveformName, waveformID=None):
     if waveform: 
         running = True
         status = "Running"
-        waveformName = waveform.name
+        waveformName = waveform._get_name()
         waveformID = waveform._get_identifier()
     
     if not waveformName: 

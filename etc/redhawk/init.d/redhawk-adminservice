@@ -74,7 +74,7 @@ PID_FILE=/var/run/redhawk/adminserviced.pid
 start() {
     echo "Starting ${SVC_NAME}"
 
-    /usr/local/redhawk/core/bin/adminserviced -c /etc/redhawk/adminserviced.conf
+    /usr/local/redhawk/core/bin/adminserviced -c /etc/redhawk/init.d/adminserviced.defaults
     retval=$?
     sleep 3
     if [ $retval == 0 ]; then
