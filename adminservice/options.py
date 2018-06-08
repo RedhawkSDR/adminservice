@@ -849,7 +849,7 @@ class ServerOptions(Options):
                 continue
             group_name = process_or_group_name(section.split(':', 1))
             programs = list_of_strings(get(section, 'programs', None))
-            enabled = boolean(get(section, 'enable', 'True'))
+            enabled = self.getEnableValue(section, get, 'True')
             priority = integer(get(section, 'priority', 999))
             group_processes = []
             for program in programs:
@@ -873,11 +873,7 @@ class ServerOptions(Options):
                 continue
             config_name = process_or_group_name(section.split(':', 1))
             priority = integer(get(section, 'priority', 999))
-            enabled = get(section, 'enable', 'True')
-            try:
-                enabled = boolean(enabled)
-            except ValueError:
-                enabled = True
+            enabled = self.getEnableValue(section, get, 'True')
             processes = self.processes_from_section(parser, section, config_name,
                                                     ProcessConfig, False, None)
             groups.append(ProcessGroupConfig(self, config_name, priority, enabled, processes))
@@ -896,9 +892,9 @@ class ServerOptions(Options):
                                                     config_class, defaults, default_config)
             if defaults:
                 default_config = processes[0]
-            else:
-                priority = integer(get(section, 'priority', default_config.priority))
-                enabled = boolean(get(section, 'enable', 'True'))
+            elif len(processes) > 0:
+                priority = processes[0].priority
+                enabled = processes[0].enable
                 domain_name = processes[0].DOMAIN_NAME
                 if groupMap.has_key(domain_name):
                     groupMap[domain_name].process_configs.extend(processes)
@@ -917,7 +913,7 @@ class ServerOptions(Options):
             # give listeners a "high" default priority so they are started first
             # and stopped last at mainloop exit
             priority = integer(get(section, 'priority', -1))
-            enabled = boolean(get(section, 'enable', 'True'))
+            enabled = self.getEnableValue(section, get, 'True')
 
             buffer_size = integer(get(section, 'buffer_size', 10))
             if buffer_size < 1:
@@ -970,7 +966,7 @@ class ServerOptions(Options):
                 continue
             program_name = process_or_group_name(section.split(':', 1))
             priority = integer(get(section, 'priority', 999))
-            enabled = boolean(get(section, 'enable', 'True'))
+            enabled = self.getEnableValue(section, get, 'True')
             fcgi_expansions = {'program_name': program_name}
 
             # find proc_uid from "user" option
@@ -1135,25 +1131,7 @@ class ServerOptions(Options):
             logfile_directory = default_klass.logfile_directory
 
         # Determine the enable flag - try convert it to a boolean
-        enablement = get(section, 'enable', None)
-        if enablement is None:
-            enablement = 'True' if default_klass is None else str(default_klass.enable)
-        try:
-            enabled = boolean(enablement)
-            enablement = enabled
-        except ValueError:
-            # If it's not a form of a true/false string, make it into a regex
-            if enablement.startswith('"') and enablement.endswith('"'):
-                enablement = enablement[1:len(enablement)-1]
-
-            # If there's an =, allow for arbitrary white space before/after
-            if "=" in enablement:
-                splt = enablement.split("=")
-                enablement = re.escape(splt[0]) + "\s*"
-                for val in splt[1:]:
-                    enablement = enablement + "=\s*" + re.escape(val)
-            # Match the entire line
-            enablement = "^" + enablement + "$"
+        enablement = self.getEnableValue(section, get, 'True' if default_klass is None else str(default_klass.enable))
 
         # find uid from "user" option
         user = get(section, 'user', None)
@@ -1318,6 +1296,28 @@ class ServerOptions(Options):
             pconfig.setValues(program_name, defaults, args)
 
         return [pconfig]
+
+    def getEnableValue(self, section, get, defaultValue):
+        enablement = get(section, 'enable', None)
+        if enablement is None:
+            enablement = defaultValue
+        try:
+            enabled = boolean(enablement)
+            enablement = enabled
+        except ValueError:
+            # If it's not a form of a true/false string, make it into a regex
+            if enablement.startswith('"') and enablement.endswith('"'):
+                enablement = enablement[1:len(enablement)-1]
+
+            # If there's an =, allow for arbitrary white space before/after
+            if "=" in enablement:
+                splt = enablement.split("=")
+                enablement = re.escape(splt[0]) + "\s*"
+                for val in splt[1:]:
+                    enablement = enablement + "=\s*" + re.escape(val)
+            # Match the entire line
+            enablement = "^" + enablement + "$"
+        return enablement
 
     def _parse_servernames(self, parser, stype):
         options = []

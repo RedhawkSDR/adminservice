@@ -727,8 +727,6 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return template % (name, 'no such file')
         elif code == xmlrpc.Faults.NOT_EXECUTABLE:
             return template % (name, 'file is not executable')
-        elif code == xmlrpc.Faults.ALREADY_STARTED:
-            return template % (name, 'already started')
         elif code == xmlrpc.Faults.SPAWN_ERROR:
             return template % (name, 'spawn error')
         elif code == xmlrpc.Faults.ABNORMAL_TERMINATION:
@@ -737,6 +735,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return template % (name, 'failed starting process')
         elif code == xmlrpc.Faults.DISABLED:
             return template % (name, 'process is disabled')
+        elif code == xmlrpc.Faults.ALREADY_STARTED:
+            return '%s: already started' % name
         elif code == xmlrpc.Faults.SUCCESS:
             return '%s: started' % name
         # assertion
@@ -825,7 +825,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         elif code == xmlrpc.Faults.BAD_SIGNAL:
             return template % (name, 'bad signal name')
         elif code == xmlrpc.Faults.NOT_RUNNING:
-            return template % (name, 'not running')
+            return '%s: already stopped' % name
         elif code == xmlrpc.Faults.SUCCESS:
             return '%s: %s' % (name, success)
         elif code == xmlrpc.Faults.FAILED:

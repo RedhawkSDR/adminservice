@@ -53,11 +53,9 @@ BuildRequires:   systemd
 Requires:        systemd
 Requires(pre):   systemd
 %else
-#Requires:       /sbin/service /sbin/chkconfig
 Requires:        initscripts
-Requires:        chkconfig
-#Requires(pre):  /sbin/service
 Requires(pre):   initscripts
+Requires:        chkconfig
 %endif
 
 # Turn off the brp-python-bytecompile script; our setup.py does byte compilation

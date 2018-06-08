@@ -389,7 +389,7 @@ class AdminServiceNamespaceRPCInterface:
         self._update('startAllProcesses')
 
         processes = self._getAllProcesses()
-        startall = make_allfunc(processes, isNotRunning, self.startProcess,
+        startall = make_startallfunc(processes, isNotRunning, self.startProcess,
                                 force=False, proc_type=proc_type, wait=wait)
 
         startall.delay = 0.05
@@ -513,7 +513,7 @@ class AdminServiceNamespaceRPCInterface:
         processes = [ (group, process) for process in processes ]
 
         killall = make_allfunc(processes, isRunning, self.stopProcess,
-                               proc_type=proc_type, wait=wait)
+                               proc_type=proc_type, wait=wait, filter_string="already stopped")
 
         killall.delay = 0.05
         killall.rpcinterface = self
@@ -530,7 +530,7 @@ class AdminServiceNamespaceRPCInterface:
         processes = self._getAllProcesses(reverse=True)
 
         killall = make_allfunc(processes, isRunning, self.stopProcess,
-                               proc_type=proc_type, wait=wait)
+                               proc_type=proc_type, wait=wait, filter_string="already stopped")
 
         killall.delay = 0.05
         killall.rpcinterface = self
@@ -1049,6 +1049,10 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
 
         if not callbacks:
             proc_type = extra_kwargs['proc_type'] if extra_kwargs.has_key('proc_type') else ''
+            filter_string = None
+            if extra_kwargs.has_key('filter_string'):
+                filter_string = extra_kwargs['filter_string']
+                extra_kwargs.pop('filter_string')
 
             for group, process in processes:
                 if len(proc_type) != 0 and not proc_type.startswith(process.config.config_type):
@@ -1073,7 +1077,13 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
                         if isinstance(callback, basestring):
                             ret['output'] = callback
                         results.append(ret)
-
+                elif filter_string is not None:
+                    results.append(
+                        {'name':process.config.name,
+                         'group':group.config.name,
+                         'status':Faults.NOT_RUNNING,
+                         'description':'OK'})
+                    
         if not callbacks:
             return results
 
@@ -1162,7 +1172,6 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
 
                     # Remove the pid file, use its existence to check if the process has started
                     if process.config.pid_file and os.path.exists(process.config.pid_file) and not process.config.check_status():
-                        print "Removing %s in make_startallfunc" % process.config.pid_file
                         os.remove(process.config.pid_file)
     
                     try:
@@ -1195,6 +1204,11 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
                              'status':Faults.SUCCESS,
                              'description':'OK'}
                             )
+                else:
+                    results.append({'name':process.config.name,
+                        'group':group.config.name,
+                        'status':Faults.ALREADY_STARTED,
+                        'description':'OK'})
 
         if not callbacks:
             return results
