@@ -396,7 +396,7 @@ class AdminServiceNamespaceRPCInterface:
         startall.rpcinterface = self
         return startall # deferred
 
-    def stopProcess(self, name, proc_type='', wait=True):
+    def stopProcess(self, name, proc_type='', wait=True, **kwargs):
         """ Stop a process named by name
 
         @param string name  The name of the process to stop (or 'group:name')
@@ -405,7 +405,12 @@ class AdminServiceNamespaceRPCInterface:
         """
         self._update('stopProcess')
 
-        group, process = self._getGroupAndProcess(name)
+        group = None
+        process = None
+        if kwargs.has_key('process'):
+            process = kwargs['process']
+        else:
+            group, process = self._getGroupAndProcess(name)
 
         if process is None:
             group_name, process_name = split_namespec(name)
@@ -483,8 +488,8 @@ class AdminServiceNamespaceRPCInterface:
         # Stop any processes that were in the old config, but aren't in the new one
         for proc in oldProcs:
             if not proc.config.name in newProcs and proc.state in RUNNING_STATES:
-                self.adminserviced.options.logger.debug("Process %s is in state %d, stopping" % (proc.config.name, proc.state))
-                self.stopProcess(proc.config.name, wait)
+                self.adminserviced.options.logger.debug("Stopping %s, it is no longer configured" % proc.config.name)
+                self.stopProcess(proc.config.name, wait, process=proc)
 
         # Save the new config and return the current process names
         config.after_setuid()
