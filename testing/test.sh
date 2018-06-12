@@ -192,6 +192,20 @@ if [[ $ret == 1 || $max == 1 ]]; then
   exit 1
 fi
 
+#
+# Set a logfile to a non-existent directory
+#
+echo
+echo "Testing nonexistent stdout logfile directory"
+startingText=$(cat /etc/redhawk/waveforms.d/max.ini)
+echo "stdout_logfile=/i/dont/exist.log" >> /etc/redhawk/waveforms.d/max.ini
+$OSSIEHOME/bin/adminserviced >> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+  echo "AdminService started with a bad ini file, should have quit"
+  exit 1
+fi
+echo "${startingText}" > /etc/redhawk/waveforms.d/max.ini
+
 echo
 shutdown $RESTART
 

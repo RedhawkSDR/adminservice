@@ -1566,7 +1566,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 config = iniContents
 
         # Find the DMD associated with the domain
-        domainName = docDmd.getElementsByTagName('domainmanagerconfiguration')[0].getAttribute('name')
+        if len(args) == 3:
+            domainName = args[2]
+        else:
+            domainName = docDmd.getElementsByTagName('domainmanagerconfiguration')[0].getAttribute('name')
 
         config = re.sub(r"\[domain:.*\]", '[domain:%s_mgr]' % domainName, config)
         config = re.sub(r"DOMAIN_NAME=.*?([;\n])", 'DOMAIN_NAME=%s \\1' % domainName, config)
@@ -1587,9 +1590,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
         
         # Find the DCD associated with the node
         nodeName = docDcd.getElementsByTagName('deviceconfiguration')[0].getAttribute('name')
-        domainName = docDcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('domainmanager')[0].getElementsByTagName('namingservice')[0].getAttribute('name').split('/')[0]
         if len(args) == 3:
             domainName = args[2]
+        else:
+            domainName = docDcd.getElementsByTagName('deviceconfiguration')[0].getElementsByTagName('domainmanager')[0].getElementsByTagName('namingservice')[0].getAttribute('name').split('/')[0]
 
         config = re.sub(r"\[node:.*\]", '[node:%s]' % nodeName, config)
         config = re.sub(r"DOMAIN_NAME=.*?([;\n])", 'DOMAIN_NAME=%s \\1' % domainName, config)
@@ -1601,7 +1605,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def process_waveform_file(self, args):
         config = '[waveform:waveform1]\nDOMAIN_NAME= \nWAVEFORM= \n'
         sadFile = args[1]
-        docSad = xml.dom.minidom.parse(args[1])
+        docSad = xml.dom.minidom.parse(sadFile)
         
         # Grab the first .ini file in the same directory as the sad.xml
         iniFiles = glob.glob(os.path.join(os.path.split(sadFile)[0], '*.ini'))

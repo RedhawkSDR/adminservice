@@ -2173,7 +2173,7 @@ class ProcessConfig(Config):
         if self.stderr_logfile is Automatic:
             self.stderr_logfile = get_autoname(name, sid, 'stderr')
         if self.run_detached and self.pid_file is None:
-            self.pid_file = os.path.join(self.options.childpiddir, "%s.%s.pid" % (self.name, self.sid))
+            self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, "%s.%s.pid" % (self.name, self.sid)))
 
         redirect = ''
         if hasattr(self, 'logfile'):
@@ -2400,12 +2400,12 @@ class RedhawkProcessConfig(ProcessConfig):
     def create_autochildlogs(self):
         logdir = self.logfile_directory if self.logfile_directory is not None else self.options.childlogdir
         if self.redirect_stderr:
-            self.logfile = os.path.join(logdir, "%s.%s.log" % (self.DOMAIN_NAME, self.name))
+            self.logfile = existing_dirpath(os.path.join(logdir, "%s.%s.log" % (self.DOMAIN_NAME, self.name)))
             self.stderr_logfile = None
             self.stdout_logfile = None
         else:
-            self.stderr_logfile = os.path.join(logdir, "%s.%s.stderr.log" % (self.DOMAIN_NAME, self.name))
-            self.stdout_logfile = os.path.join(logdir, "%s.%s.stdout.log" % (self.DOMAIN_NAME, self.name))
+            self.stderr_logfile = existing_dirpath(os.path.join(logdir, "%s.%s.stderr.log" % (self.DOMAIN_NAME, self.name)))
+            self.stdout_logfile = existing_dirpath(os.path.join(logdir, "%s.%s.stdout.log" % (self.DOMAIN_NAME, self.name)))
 
         redirect = ''
         if hasattr(self, 'logfile'):
@@ -2490,11 +2490,11 @@ class DomainConfig(RedhawkProcessConfig):
             if self.DOMAIN_NAME is None or self.DOMAIN_NAME.find(' ') > -1:
                 raise ValueError("Invalid value for %s: '%s'" % ('DOMAIN_NAME', self.DOMAIN_NAME))
             
-            self.pid_file = os.path.join(self.options.childpiddir, 'domain-mgrs', "%s.pid" % self.DOMAIN_NAME)
+            self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, 'domain-mgrs', "%s.pid" % self.DOMAIN_NAME))
             self.command = self.make_command()
 
     def create_autochildlogs(self):
-        self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'domain-mgrs')
+        self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'domain-mgrs'))
         RedhawkProcessConfig.create_autochildlogs(self)
 
 class NodeConfig(RedhawkProcessConfig):
@@ -2536,11 +2536,11 @@ class NodeConfig(RedhawkProcessConfig):
             elif self.DCD_FILE is None:
                 self.DCD_FILE = "/nodes/%s/DeviceManager.dcd.xml" % self.NODE_NAME
 
-            self.pid_file = os.path.join(self.options.childpiddir, 'device-mgrs', "%s.%s.pid" % (self.DOMAIN_NAME, self.name))
+            self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, 'device-mgrs', "%s.%s.pid" % (self.DOMAIN_NAME, self.name)))
             self.command = self.make_command()
 
     def create_autochildlogs(self):
-        self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'device-mgrs')
+        self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'device-mgrs'))
         RedhawkProcessConfig.create_autochildlogs(self)
 
 class WaveformConfig(RedhawkProcessConfig):
@@ -2571,8 +2571,8 @@ class WaveformConfig(RedhawkProcessConfig):
             wave_name = self.WAVEFORM
             if self.INSTANCE_NAME is not None:
                 wave_name += "." + self.INSTANCE_NAME
-            self.logfile_directory = self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'waveforms')
-            self.pid_file = os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name))
+            self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'waveforms'))
+            self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name)))
 
             self.command = self.command + " -d " + self.DOMAIN_NAME
             self.command = self.command + " -w " + self.WAVEFORM
