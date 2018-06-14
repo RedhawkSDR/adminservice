@@ -1,9 +1,9 @@
 [node:default]
 command=dev/mgr/DeviceManager           ; required relative path to the device manager - combined with SDRROOT
-DOMAIN_NAME=                            ; required name of your domain - no default
-SPD=/mgr/DeviceManager.spd.xml          ; required relative path to the DeviceManagers spd file
-DCD_FILE=                               ; optional relative path to the DCD file - uses NODE_NAME for path if blank
-NODE_NAME=                              ; optional if DCD_FILE is blank - name of your node
+DOMAIN_NAME=                            ; required name of your domain
+SPD=/mgr/DeviceManager.spd.xml          ; required relative path from SDRROOT/dev to the DeviceManagers spd file
+NODE_NAME=                              ; required name of your node
+DCD_FILE=                               ; optional relative path from SDRROOT/dev to the DCD file
 SDRCACHE=                               ; optional absolute path for DeviceManager to create cache directory
 
 DEBUG_LEVEL=INFO                        ; optional 5=TRACE,4=DEBUG,3=INFO,2=WARN,1=ERROR,0=FATAL numbers or name
@@ -16,17 +16,17 @@ PATH=%(ENV_OSSIEHOME)s/bin:%(ENV_PATH)s ; optional add to the PATH before execut
 enable=1                                ; optional 1 to enable or 0 to disable this node
 conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customize the enable string
 
-logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/device-mgr/<domain_name>.<node_name>.log
-redirect_stderr=true              ; optional redirect proc stderr to stdout (default false)
+logfile_directory=                ; optional logfile location
+redirect_stderr=true              ; optional redirect proc stderr to stdout
 
 directory=%(ENV_SDRROOT)s         ; optional directory to cwd to before running scripts and services
-priority=400                      ; optional the relative start priority (default 999)
+priority=400                      ; optional the relative start priority
 run_detached=True                 ; optional run this process as a daemon
-autostart=True                    ; optional start at adminserviced start (default: true)
-startsecs=5                       ; optional # of secs prog must stay up to be running (def. 1)
-startretries=0                    ; optional max # of serial start failures when starting (default 3)
-autorestart=False                 ; optional when to restart if exited after running (def: False)
-stopsignal=TERM                   ; optional signal used to kill process (default TERM)
+autostart=True                    ; optional start at adminserviced start
+startsecs=5                       ; optional # of secs prog must stay up to be running
+startretries=0                    ; optional max # of serial start failures when starting
+autorestart=False                 ; optional when to restart if exited after running
+stopsignal=TERM                   ; optional signal used to kill process
 waitforprevious=45                ; optional wait this many seconds for the previously enabled process in this group to start
 failafterwait=True                ; optional abort starting this group if the wait times out
 

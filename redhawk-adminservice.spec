@@ -101,6 +101,8 @@ install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/log/redhawk/waveforms
 %{__mv} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/systemd/redhawk-adminservice.service $RPM_BUILD_ROOT%{_unitdir}
 %{__mv} $RPM_BUILD_ROOT%{_sysconfdir}/redhawk/systemd/redhawk-adminservice-setup.service $RPM_BUILD_ROOT%{_unitdir}
 %else
+rm -f $RPM_BUILD_ROOT/%{_bindir}/adminserviced-start
+rm -f $RPM_BUILD_ROOT/%{_bindir}/adminserviced-stop
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/device-mgrs
 install -d -m 0775 $RPM_BUILD_ROOT%{_localstatedir}/run/redhawk/domain-mgrs
@@ -117,10 +119,6 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %{_bindir}/adminserviced
-%{_bindir}/adminserviced-start
-%{_bindir}/adminserviced-stop
-%{_bindir}/echo_adminserviced_conf
-%{_bindir}/pidproxy
 %{_bindir}/rhadmin
 %config %attr(660,root,redhawk) %{_sysconfdir}/redhawk/adminserviced.conf
 %config %attr(664,root,redhawk) %{_sysconfdir}/redhawk/rh.cond.cfg
@@ -154,6 +152,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/python/adminservice-%{version}-py%{python_version}.egg-info
 %endif
 %if 0%{?with_systemd}
+%{_bindir}/adminserviced-start
+%{_bindir}/adminserviced-stop
 %{_bindir}/redhawk-adminservice-setup
 %{_unitdir}/redhawk-adminservice.service
 %{_unitdir}/redhawk-adminservice-setup.service

@@ -1,8 +1,7 @@
 [node:node1]
-DOMAIN_NAME=                            ; required name of your domain - no default
-SPD=/mgr/DeviceManager.spd.xml          ; required relative path to the DeviceManagers spd file
-DCD_FILE=                               ; optional relative path to the DCD file - uses NODE_NAME for path if blank
-NODE_NAME=                              ; optional if DCD_FILE is blank - name of your node
+DOMAIN_NAME=                            ; required name of your domain
+NODE_NAME=                              ; required name of your node
+DCD_FILE=                               ; optional relative path from SDRROOT/dev to the DCD file
 SDRCACHE=                               ; optional absolute path for DeviceManager to create cache directory
 CLIENT_WAIT_TIME=                       ; optional amount of time to wait (milliseconds) for completion of client requests
 ORB_ENDPOINT=                           ; optional Sets the endpoint for the DomainManager servant
@@ -22,23 +21,23 @@ ORB_CFG=                                ; optional path to omniORB configuration
 
 enable=1                                      ; optional 1 to enable or 0 to disable this node
 conditional_config=/etc/redhawk/rh.cond.cfg   ; optional configuration file passed to customize the enable string
-;environment=ORB_CFG="/etc/omniORB.cfg",B=""  ; optional process environment additions (def no adds)
+;environment=ORB_CFG="/etc/omniORB.cfg",B=""  ; optional process environment additions
 
-logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/device-mgr/<domain_name>.<node_name>.log
-stderr_logfile=                   ; optional stderr log file name; default AUTO
-stdout_logfile=                   ; optional stdout log file name; default AUTO
-redirect_stderr=True              ; optional redirect proc stderr to stdout (default false)
+logfile_directory=                ; optional logfile location
+stderr_logfile=                   ; optional stderr log file name
+stdout_logfile=                   ; optional stdout log file name
+redirect_stderr=True              ; optional redirect proc stderr to stdout
 
 directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts and services
-priority=400                      ; optional the relative start priority (default 999)
+priority=400                      ; optional the relative start priority
 run_detached=True                 ; optional run this process as a daemon
-autostart=True                    ; optional start at supervisord start (default: true)
+autostart=True                    ; optional start at supervisord start
 ;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
 ;failafterwait=True               ; optional abort starting this group if the wait times out
 
 ;user=redhawk                     ; optional setuid to this UNIX account to run the program
 ;group=redhawk                    ; optional setgid to this UNIX group to run the program
-;umask=022                        ; optional umask for process (default None)
+;umask=022                        ; optional umask for process
 
 ;nicelevel=                       ; optional cmd line args to pass to nice when running process
 ;affinity=                        ; optional cmd line args to pass to numactl when running process
@@ -51,4 +50,5 @@ autostart=True                    ; optional start at supervisord start (default
 ;stop_post_script=                ; optional script to run after stopping the process
 ;status_script=                   ; optional script to run to check status of the process
 ;started_status_script=           ; optional script to run to check if the process has started
+;query_script=                    ; optional script to run to get detailed status output
 

@@ -1138,6 +1138,7 @@ class ServerOptions(Options):
         if user is None:
             uid = None if default_klass is None else default_klass.uid
         else:
+            parser.remove_option(section, 'user')
             uid = name_to_uid(user)
 
         # find uid from "group" option
@@ -1148,6 +1149,7 @@ class ServerOptions(Options):
             else:
                 gid = default_klass.gid if default_klass.gid is not None else gid_for_uid(uid) if uid is not None else None
         else:
+            parser.remove_option(section, 'group')
             gid = name_to_gid(group)
 
         umask = get(section, 'umask', None)
@@ -1292,7 +1294,23 @@ class ServerOptions(Options):
                         args[key] = val
                 except:
                     pass
-    
+
+            allKeys = set(parser.options(section))
+            knownKeys = set([k.lower() for k in pconfig.optional_param_names])
+            knownKeys |= set([k.lower() for k in pconfig.req_param_names])
+            knownKeys |= set([k.lower() for k in pconfig.add_req_param_names])
+            remaining = filter(lambda x: x not in knownKeys, allKeys)
+            args2 = {}
+            for key in remaining:
+                try:
+                    val = filter_comment(get(section, key, expansions=expansions))
+                    if val is not None and len(val) > 0:
+                        args2[key] = val
+                except:
+                    pass
+            if len(args2) != 0:
+                args['extras'] = args2
+
             pconfig.setValues(program_name, defaults, args)
 
         return [pconfig]
@@ -2375,6 +2393,10 @@ class RedhawkProcessConfig(ProcessConfig):
             val = getattr(self, name, None)
             if val is not None:
                 self.environment[name] = val
+        if params.has_key('extras'):
+            extras = params['extras']
+            for key in extras.keys():
+                setattr(self, key, extras.get(key))
 
     def make_command(self):
         comm = os.path.join(self.SDRROOT, self.command)

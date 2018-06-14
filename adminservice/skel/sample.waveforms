@@ -1,32 +1,31 @@
 [waveform:waveform1]
-DOMAIN_NAME=                                   ; required name of your domain - no default
-# One of the next two is required
-WAVEFORM=                                      ; required the name of the waveform(optionally namespaced) - no default
+DOMAIN_NAME=                                   ; required name of your domain
+WAVEFORM=                                      ; required the name of the waveform(optionally namespaced)
 
 INSTANCE_NAME=                                 ; optional name of the launched waveform
 
-OSSIEHOME=%(ENV_OSSIEHOME)s                    ; optional override OSSIEHOME - if blank uses $OSSIEHOME, fallback /usr/local/redhawk
+OSSIEHOME=%(ENV_OSSIEHOME)s                    ; optional override OSSIEHOME - if blank uses $OSSIEHOME
 PYTHONPATH=%(ENV_OSSIEHOME)s/lib/python:%(ENV_PYTHONPATH)s ; optional set up PYTHONPATH before execution
 
 enable=1                                       ; optional 1 to enable or 0 to disable this waveform
 conditional_config=/etc/redhawk/rh.cond.cfg    ; optional configuration file passed to customize the enable string
-;environment=ORB_CFG="/etc/omniORB.cfg",B="    ; optional process environment additions (def no adds)
+;environment=ORB_CFG="/etc/omniORB.cfg",B="    ; optional process environment additions
 
-logfile_directory=                ; optional logfile location - defaults to /var/log/redhawk/waveforms/<domain_name>.<WAVEFORM_INSTANCE_ID>.log
-stderr_logfile=                   ; optional stderr log file name; default AUTO
-stdout_logfile=                   ; optional stdout log file name; default AUTO
-redirect_stderr=True              ; optional redirect proc stderr to stdout (default false)
+logfile_directory=                ; optional logfile location
+stderr_logfile=                   ; optional stderr log file name
+stdout_logfile=                   ; optional stdout log file name
+redirect_stderr=True              ; optional redirect proc stderr to stdout
 
 directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts
-priority=900                      ; optional the relative start priority (default 999)
+priority=900                      ; optional the relative start priority
 run_detached=True                 ; optional run this process as a daemon
-autostart=True                    ; optional start at adminserviced start (default: true)
+autostart=True                    ; optional start at adminserviced start
 ;waitforprevious=45               ; optional wait this many seconds for the previously enabled process in this group to start
 ;failafterwait=False              ; optional abort starting this group if the wait times out
 
 ;user=redhawk                     ; optional setuid to this UNIX account to run the program
 ;group=redhawk                    ; optional setgid to this UNIX group to run the program
-;umask=022                        ; optional umask for process (default None)
+;umask=022                        ; optional umask for process
 
 ;start_pre_script=                ; optional script to run before starting the process
 ;start_post_script=               ; optional script to run after starting the process
@@ -34,5 +33,6 @@ autostart=True                    ; optional start at adminserviced start (defau
 ;stop_post_script=                ; optional script to run after stopping the process
 ;status_script=                   ; optional script to run to check status of the process
 ;started_status_script=           ; optional script to run to check if the process has started
+;query_script=                    ; optional script to run to get detailed status output
 
 start_delay=30                    ; optional total time to try restarting waveform before declaring failure

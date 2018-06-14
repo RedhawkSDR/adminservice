@@ -59,8 +59,6 @@ dist = setup(
         'console_scripts': [
         'adminserviced = adminservice.adminserviced:main',
         'rhadmin = adminservice.rhadmin:main',
-        'echo_adminserviced_conf = adminservice.confecho:main',
-        'pidproxy = adminservice.pidproxy:main',
         ],
     },
 )
