@@ -284,4 +284,30 @@ echo $startingCond > /etc/redhawk/rh.cond.cfg
 echo
 shutdown $RESTART
 
+# Test the ability to retrieve undeclared config values
+echo
+echo "Testing getconfig for a waveform"
+echo "test=value1" >> /etc/redhawk/waveforms.d/max.ini
+rhadmin update
+testVal=`rhadmin getconfig REDHAWK_DEV:max test`
+$(sed -i "s~test=value1~~" ${file})
+if [[ "${testVal}" -ne "value1" ]]; then
+  echo "Didn't find the right extra parameter in max.ini(${testVal})"
+  exit 1
+fi
+
+# Test undeclared config values in extras.d files
+echo
+echo "Testing getconfig for an extras file"
+echo "[program:testProg]\ncommand=/usr/bin/sleep\ntest=val\n" > /etc/redhawk/extras.d/testProg.ini
+rhadmin update
+testVal=`rhadmin getconfig testProg test`
+if [[ "${testVal}" -ne "val" ]]; then
+  echo "Didn't find the right extra parameter in testProg.ini(${testVal})"
+  exit 1
+fi
+rm /etc/redhawk/extras.d/testProg.ini
+
+shutdown $RESTART
+
 exit 0

@@ -1269,15 +1269,15 @@ class ServerOptions(Options):
             ulimit=ulimit,
             corefiles=corefiles)
         
+        def filter_comment(val):
+            if val is not None and val.find(';') == 0:
+                return None
+            return val
+
         if defaults or default_klass is not None:
             if default_klass is not None:
                 default_klass.copyInto(pconfig)
             
-            def filter_comment(val):
-                if val is not None and val.find(';') == 0:
-                    return None
-                return val
-
             args = {}
             for key in klass.add_req_param_names:
                 try:
@@ -1295,23 +1295,23 @@ class ServerOptions(Options):
                 except:
                     pass
 
-            allKeys = set(parser.options(section))
-            knownKeys = set([k.lower() for k in pconfig.optional_param_names])
-            knownKeys |= set([k.lower() for k in pconfig.req_param_names])
-            knownKeys |= set([k.lower() for k in pconfig.add_req_param_names])
-            remaining = filter(lambda x: x not in knownKeys, allKeys)
-            args2 = {}
-            for key in remaining:
-                try:
-                    val = filter_comment(get(section, key, expansions=expansions))
-                    if val is not None and len(val) > 0:
-                        args2[key] = val
-                except:
-                    pass
-            if len(args2) != 0:
-                args['extras'] = args2
-
             pconfig.setValues(program_name, defaults, args)
+
+        # Add any extra parameters that we don't know how to deal with to the config
+        allKeys = set(parser.options(section))
+        knownKeys = set([k.lower() for k in pconfig.optional_param_names])
+        knownKeys |= set([k.lower() for k in pconfig.req_param_names])
+        if hasattr(pconfig, 'add_req_param_names'):
+            knownKeys |= set([k.lower() for k in pconfig.add_req_param_names])
+        remaining = filter(lambda x: x not in knownKeys, allKeys)
+
+        for key in remaining:
+            try:
+                val = filter_comment(get(section, key, expansions=expansions))
+                if val is not None and len(val) > 0:
+                    setattr(pconfig, key, val)
+            except:
+                pass
 
         return [pconfig]
 
@@ -2393,10 +2393,6 @@ class RedhawkProcessConfig(ProcessConfig):
             val = getattr(self, name, None)
             if val is not None:
                 self.environment[name] = val
-        if params.has_key('extras'):
-            extras = params['extras']
-            for key in extras.keys():
-                setattr(self, key, extras.get(key))
 
     def make_command(self):
         comm = os.path.join(self.SDRROOT, self.command)
