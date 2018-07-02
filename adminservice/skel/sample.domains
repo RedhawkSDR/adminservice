@@ -1,0 +1,51 @@
+[domain:domain1]
+DOMAIN_NAME=                            ; required name of your domain
+
+FORCE_REBIND=0                          ; optional 1 - force rebind Domain in NamingService, 0 - do not rebind
+PERSISTENCE=0                           ; optional 1 to turn on, 0 for off
+DB_FILE=                                ; optional path to where the domain persistence file gets saved
+ORB_ENDPOINT=                           ; optional Sets the endpoint for the DomainManager servant
+ORB_INITREF=                            ; optional -ORBInitRef to pass to the process
+USELOGCFG=                              ; optional 1 to enable use of libossielog.so to resolve LOGGING_CONFIG_URI
+BINDAPPS=                               ; optional Application binding: 0 - Bind to NamingService , 1 - Bind using Domain
+DEBUG_LEVEL=INFO                        ; optional 5=TRACE,4=DEBUG,3=INFO,2=WARN,1=ERROR,0=FATAL numbers or name
+
+LOGGING_CONFIG_URI=/etc/redhawk/logging/default.logging.properties ; optional path to log configuration file
+
+SDRROOT=%(ENV_SDRROOT)s                 ; optional if blank uses $SDRROOT
+OSSIEHOME=%(ENV_OSSIEHOME)s             ; optional if blank uses $OSSIEHOME
+LD_LIBRARY_PATH=                        ; optional set up LD_LIBRARY_PATH before execution
+PYTHONPATH=                             ; optional set up PYTHONPATH before execution
+ORB_CFG=                                ; optional path to omniORB configuration file
+
+enable=1                                     ; optional 0/1 enable or disable this domain
+conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customizeable override enable method
+;environment=ORB_CFG="/etc/omniORB.cfg",B="  ; optional process environment additions
+
+logfile_directory=             ; optional logfile location
+stderr_logfile=                ; optional stderr log file name
+stdout_logfile=                ; optional stdout log file name
+redirect_stderr=True           ; optional redirect proc stderr to stdout
+
+directory=%(ENV_SDRROOT)s      ; optional directory to cd to before running scripts and services
+priority=100                   ; optional the relative start priority
+run_detached=True              ; optional run this process as a daemon
+autostart=True                 ; optional start at supervisord start
+
+;user=redhawk                  ; optional setuid to this UNIX account to run the program
+;group=redhawk                 ; optional setgid to this UNIX group to run the program
+;umask=022                     ; optional umask for process
+
+;nicelevel=                    ; optional cmd line args to pass to nice when running process
+;affinity=                     ; optional cmd line args to pass to numactl when running process
+;ulimit=                       ; optional cmd line args to pass to ulimit before running process
+;corefiles=0                   ; optional max core file size or 0 to use ulimit settings
+
+;start_pre_script=             ; optional script to run before starting the process
+;start_post_script=            ; optional script to run after starting the process
+;stop_pre_script=              ; optional script to run before stopping the process
+;stop_post_script=             ; optional script to run after stopping the process
+;status_script=                ; optional script to run to check status of the process
+;started_status_script=        ; optional script to run to check if the process has started
+;query_script=                 ; optional script to run to get detailed status output
+

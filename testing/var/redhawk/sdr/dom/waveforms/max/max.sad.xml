@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE softwareassembly PUBLIC "-//JTRS//DTD SCA V2.2.2 SAD//EN" "softwareassembly.dtd">
+<softwareassembly id="DCE:68d314b6-5dfb-4acd-a2c6-2a42d5fa62fe" name="max">
+  <componentfiles>
+    <componentfile id="ComponentHost_e9074ee7-2c83-4a7f-afaa-1a2ada7afc0e" type="SPD">
+      <localfile name="/mgr/rh/ComponentHost/ComponentHost.spd.xml"/>
+    </componentfile>
+  </componentfiles>
+  <partitioning>
+    <componentplacement>
+      <componentfileref refid="ComponentHost_e9074ee7-2c83-4a7f-afaa-1a2ada7afc0e"/>
+      <componentinstantiation id="ComponentHost_1">
+        <usagename>ComponentHost_1</usagename>
+        <findcomponent>
+          <namingservice name="ComponentHost_1"/>
+        </findcomponent>
+      </componentinstantiation>
+    </componentplacement>
+  </partitioning>
+  <assemblycontroller>
+    <componentinstantiationref refid="ComponentHost_1"/>
+  </assemblycontroller>
+</softwareassembly>

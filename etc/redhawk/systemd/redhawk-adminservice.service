@@ -1,0 +1,15 @@
+[Unit]
+Description=Redhawk Admin Service
+After=redhawk-adminservice-setup.service
+
+[Service]
+Type=forking
+ExecStart=/usr/local/redhawk/core/bin/adminserviced-start
+ExecStop=/usr/local/redhawk/core/bin/adminserviced-stop
+WorkingDirectory=/etc/redhawk
+TimeoutSec=20s
+KillMode=none
+PIDFile=/var/run/redhawk/adminserviced.pid
+
+[Install]
+WantedBy=multi-user.target

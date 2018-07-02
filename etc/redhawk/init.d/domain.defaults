@@ -1,0 +1,30 @@
+[domain:default]
+command=dom/mgr/DomainManager           ; required relative path to the domain manager - combined with SDRROOT
+DOMAIN_NAME=                            ; required name of your domain
+DMD_FILE=/domain/DomainManager.dmd.xml  ; required relative path from SDRROOT/dom to the DMD file
+
+PERSISTENCE=0                     ; optional 1 to turn on, 0 for off
+DEBUG_LEVEL=INFO                  ; optional 5=TRACE,4=DEBUG,3=INFO,2=WARN,1=ERROR,0=FATAL numbers or name
+
+LOGGING_CONFIG_URI=/etc/redhawk/logging/default.logging.properties ; optional path to log configuration file
+
+SDRROOT=%(ENV_SDRROOT)s           ; optional if blank uses $SDRROOT, fallback /var/redhawk/sdr
+OSSIEHOME=%(ENV_OSSIEHOME)s       ; optional if blank uses $OSSIEHOME, fallback /usr/local/redhawk
+
+enable=1                          ; optional 1 to enable or 0 to disable this domain
+conditional_config=/etc/redhawk/rh.cond.cfg  ; optional configuration file passed to customize the enable string
+
+logfile_directory=                ; optional logfile location
+redirect_stderr=true              ; optional redirect proc stderr to stdout
+
+directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts and services
+priority=100                      ; optional the relative start priority
+run_detached=True                 ; optional run this process as a daemon
+autostart=True                    ; optional start at adminserviced start
+startsecs=5                       ; optional # of secs prog must stay up to be running
+startretries=0                    ; optional max # of serial start failures when starting
+autorestart=False                 ; optional when to restart if exited after running
+stopsignal=TERM                   ; optional signal used to kill process
+
+user=redhawk                      ; optional setuid to this UNIX account to run the program
+group=redhawk                     ; optional setgid to this UNIX group to run the program

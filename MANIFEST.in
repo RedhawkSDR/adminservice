@@ -1,13 +1,7 @@
-include CHANGES.txt
 include COPYRIGHT.txt
 include LICENSES.txt
-include README.rst
 include tox.ini
-include supervisor/version.txt
-include supervisor/scripts/*.py
-include supervisor/skel/*.conf
-recursive-include supervisor/tests/fixtures *.conf *.py
-recursive-include supervisor/ui *.html *.css *.png *.gif
-include docs/Makefile
-recursive-include docs *.py *.rst *.css *.gif *.png
-recursive-exclude docs/.build *
+include adminservice/version.txt
+include adminservice/scripts/*.py
+include adminservice/skel/sample.*
+recursive-include adminservice/ui *.html *.css *.png *.gif

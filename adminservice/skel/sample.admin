@@ -1,0 +1,9 @@
+[unix_http_server]
+file=/var/run/redhawk/adminservice.sock ; the path to the socket file
+username=redhawk                        ; default is no username (open server)
+password=redhawk                        ; default is no password (open server)
+
+[rhadmin]
+serverurl=unix:///var/run/redhawk/adminserviced.sock ; use a unix:// URL for a unix socket
+username=redhawk                                     ; should be same as in [unix_http_server] if set
+password=redhawk                                     ; should be same as in [unix_http_server] if set

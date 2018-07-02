@@ -14,13 +14,7 @@
 
 import os
 import sys
-
-if sys.version_info[:2] < (2, 4) or sys.version_info[0] > 2:
-    msg = ("Supervisor requires Python 2.4 or later but does not work on "
-           "any version of Python 3.  You are using version %s.  Please "
-           "install using a supported version." % sys.version)
-    sys.stderr.write(msg)
-    sys.exit(1)
+from setuptools import setup
 
 if sys.version_info[:2] < (2, 5):
     # meld3 1.0.0 dropped python 2.4 support
@@ -29,61 +23,42 @@ if sys.version_info[:2] < (2, 5):
 else:
     requires = ['meld3 >= 0.6.5']
 
-from setuptools import setup, find_packages
+ossiehome = os.getenv('OSSIEHOME')
+homeSys = False
+installArg = False
+if 'install' in sys.argv:
+    installArg = True
+for arg in sys.argv:
+    if '--home' in arg:
+        homeSys = True
+        
+if not homeSys and ossiehome != None and installArg:
+    sys.argv.append('--home='+ossiehome)
+if not ('--old-and-unmanageable' in sys.argv) and installArg:
+    sys.argv.append('--old-and-unmanageable')
+
+README = """\
+AdminService is a client/server system that allows its users to
+control a number of REDHAWK processes on UNIX-like operating systems. 
+It is based on Supervisor(http://supervisord.org)"""
+
 here = os.path.abspath(os.path.dirname(__file__))
-try:
-    README = open(os.path.join(here, 'README.rst')).read()
-    CHANGES = open(os.path.join(here, 'CHANGES.txt')).read()
-except:
-    README = """\
-Supervisor is a client/server system that allows its users to
-control a number of processes on UNIX-like operating systems. """
-    CHANGES = ''
-
-CLASSIFIERS = [
-    'Development Status :: 5 - Production/Stable',
-    'Environment :: No Input/Output (Daemon)',
-    'Intended Audience :: System Administrators',
-    'Natural Language :: English',
-    'Operating System :: POSIX',
-    'Topic :: System :: Boot',
-    'Topic :: System :: Monitoring',
-    'Topic :: System :: Systems Administration',
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 2",
-    "Programming Language :: Python :: 2.4",
-    "Programming Language :: Python :: 2.5",
-    "Programming Language :: Python :: 2.6",
-    "Programming Language :: Python :: 2.7",
-]
-
-version_txt = os.path.join(here, 'supervisor/version.txt')
-supervisor_version = open(version_txt).read().strip()
+version_txt = os.path.join(here, 'adminservice/version.txt')
+adminservice_version = open(version_txt).read().strip()
 
 dist = setup(
-    name='supervisor',
-    version=supervisor_version,
-    license='BSD-derived (http://www.repoze.org/LICENSE.txt)',
-    url='http://supervisord.org/',
-    description="A system for controlling process state under UNIX",
-    long_description=README + '\n\n' + CHANGES,
-    classifiers=CLASSIFIERS,
-    author="Chris McDonough",
-    author_email="chrism@plope.com",
-    packages=find_packages(),
+    name='adminservice',
+    version=adminservice_version,
+    description="A system for controlling REDHAWK process state under UNIX",
     install_requires=requires,
     extras_require={'iterparse': ['cElementTree >= 1.0.2']},
-    tests_require=['mock >= 0.5.0'],
     include_package_data=True,
     zip_safe=False,
-    namespace_packages=['supervisor'],
-    test_suite="supervisor.tests",
+    packages=['adminservice', 'adminservice/medusa'],
     entry_points={
         'console_scripts': [
-         'supervisord = supervisor.supervisord:main',
-         'supervisorctl = supervisor.supervisorctl:main',
-         'echo_supervisord_conf = supervisor.confecho:main',
-         'pidproxy = supervisor.pidproxy:main',
+        'adminserviced = adminservice.adminserviced:main',
+        'rhadmin = adminservice.rhadmin:main',
         ],
     },
 )

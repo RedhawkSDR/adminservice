@@ -1,0 +1,36 @@
+[waveform:default]
+command=/etc/redhawk/init.d/redhawk-wf-control ; required absolute path to the waveform control script
+DOMAIN_NAME=                                   ; required name of your domain
+# One of the next two is required
+WAVEFORM=                                      ; required the name of the waveform(optionally namespaced)
+
+INSTANCE_NAME=                                 ; optional name of the launched waveform
+
+enable=1                                       ; optional 1 to enable or 0 to disable this waveform
+conditional_config=/etc/redhawk/rh.cond.cfg    ; optional configuration file passed to customize the enable string
+
+SDRROOT=%(ENV_SDRROOT)s                        ; optional override SDRROOT - if blank uses $SDRROOT, fallback /var/redhawk/sdr
+OSSIEHOME=%(ENV_OSSIEHOME)s                    ; optional override OSSIEHOME - if blank uses $OSSIEHOME, fallback /usr/local/redhawk
+PYTHONPATH=%(ENV_OSSIEHOME)s/lib/python:%(ENV_PYTHONPATH)s ; optional set up PYTHONPATH before execution
+
+logfile_directory=                ; optional logfile location
+redirect_stderr=true              ; optional redirect proc stderr to stdout
+
+directory=%(ENV_SDRROOT)s         ; optional directory to cd to before running scripts
+priority=900                      ; optional the relative start priority
+run_detached=True                 ; optional run this process as a daemon
+autostart=True                    ; optional start at supervisord start
+startsecs=10                      ; optional # of secs prog must stay up to be running
+startretries=0                    ; optional max # of serial start failures when starting
+autorestart=False                 ; optional when to restart if exited after running
+stopsignal=TERM                   ; optional signal used to kill process
+waitforprevious=45                ; optional wait this many seconds for the previously enabled process in this group to start
+failafterwait=False               ; optional abort starting this group if the wait times out
+
+user=redhawk                      ; optional setuid to this UNIX account to run the program
+group=redhawk                     ; optional setgid to this UNIX group to run the program
+
+start_delay=30                    ; optional total time to try restarting waveform before declaring failure
+start_cmd_option=-o create        ; optional extra arguments required to make a valid start command
+status_cmd_option=-o status       ; optional extra arguments required to make a valid status command
+stop_cmd_option=-o remove         ; optional extra arguments required to make a valid stop command
