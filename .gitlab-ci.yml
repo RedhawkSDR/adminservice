@@ -7,7 +7,7 @@ before_script:
     - if [ -z "$CI_COMMIT_TAG" ]; then
         rpm_release="0.$CI_PIPELINE_ID";
       else
-        rpm_release="`rpm --query --queryformat "%{release}\n" --specfile ${namespace}$CI_PROJECT_NAME.spec | head -n 1 | awk -F"." "{print $1}"`";
+        rpm_release="`rpm --query --queryformat "%{release}\n" --specfile ${specfile} | head -n 1 | awk -F"." "{print $1}"`";
       fi
 
 .package: &package
