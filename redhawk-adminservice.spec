@@ -26,7 +26,7 @@
 Prefix:         %{_prefix}
 
 Name:           redhawk-adminservice
-Version:        2.1.3
+Version:        2.3.0
 Release:        1%{?dist}
 Summary:        Redhawk Admin Service
 
