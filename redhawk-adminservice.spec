@@ -27,7 +27,7 @@ Prefix:         %{_prefix}
 
 Name:           redhawk-adminservice
 Version:        2.2.4
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Redhawk Admin Service
 
 Group:          Applications/Engineering
