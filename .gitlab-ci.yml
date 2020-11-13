@@ -37,18 +37,6 @@ before_script:
     - master
     - /^(\d+\.)?(\d+)?(\.\d+)$/
 
-package-el6-i386:
-  variables:
-    dist: el6
-    arch: i686
-  <<: *package
-
-package-el6:
-  variables:
-    dist: el6
-    arch: x86_64
-  <<: *package
-
 package-el7:
   variables:
     dist: el7
@@ -91,18 +79,3 @@ deploy-el7:
     - package-el7
   <<: *s3
 
-deploy-el6:
-  variables:
-    dist: el6
-    arch: x86_64
-  dependencies:
-    - package-el6
-  <<: *s3
-
-deploy-el6-i386:
-  variables:
-    dist: el6
-    arch: i686
-  dependencies:
-    - package-el6-i386
-  <<: *s3
