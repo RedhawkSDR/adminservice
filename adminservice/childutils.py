@@ -1,6 +1,6 @@
 import sys
 import time
-import xmlrpclib
+import xmlrpc.client
 from adminservice.xmlrpc import AdminServiceTransport
 from adminservice.events import ProcessCommunicationEvent
 from adminservice.dispatchers import PEventListenerDispatcher
@@ -14,7 +14,7 @@ def getRPCInterface(env):
     # dumbass ServerProxy won't allow us to pass in a non-HTTP url,
     # so we fake the url we pass into it and always use the transport's
     # 'serverurl' to figure out what to attach to
-    return xmlrpclib.ServerProxy('http://127.0.0.1', getRPCTransport(env))
+    return xmlrpc.client.ServerProxy('http://127.0.0.1', getRPCTransport(env))
 
 def get_headers(line):
     return dict([ x.split(':') for x in line.split() ])
@@ -27,7 +27,7 @@ def eventdata(payload):
 def get_asctime(now=None):
     if now is None: # for testing
         now = time.time() # pragma: no cover
-    msecs = (now - long(now)) * 1000
+    msecs = (now - int(now)) * 1000
     part1 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now))
     asctime = '%s,%03d' % (part1, msecs)
     return asctime

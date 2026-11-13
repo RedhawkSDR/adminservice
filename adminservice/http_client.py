@@ -3,7 +3,7 @@
 import sys
 import socket
 import base64
-from urlparse import urlparse
+from urllib.parse import urlparse
 
 from adminservice.medusa import asynchat_25 as asynchat
 
@@ -32,7 +32,7 @@ class Listener(object):
     def close(self, url):
         pass
 
-class HTTPHandler(object, asynchat.async_chat):
+class HTTPHandler(asynchat.async_chat):
     def __init__(self, listener, username='', password=None):
         super(HTTPHandler, self).__init__()
         asynchat.async_chat.__init__(self)

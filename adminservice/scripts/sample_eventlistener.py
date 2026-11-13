@@ -1,4 +1,4 @@
-#!/usr/bin/env python -u
+#!/usr/bin/env python3 -u
 
 # A sample long-running adminservice event listener which demonstrates
 # how to accept event notifications from adminservice and how to respond

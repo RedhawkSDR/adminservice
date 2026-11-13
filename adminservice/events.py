@@ -30,7 +30,7 @@ class ProcessLogEvent(Event):
 
     def __str__(self):
         groupname = ''
-        if self.process.group is not None:
+        if self.process.group != None:
             groupname = self.process.group.config.name
         return 'processname:%s groupname:%s pid:%s channel:%s\n%s' % (
             self.process.config.name,
@@ -58,7 +58,7 @@ class ProcessCommunicationEvent(Event):
 
     def __str__(self):
         groupname = ''
-        if self.process.group is not None:
+        if self.process.group != None:
             groupname = self.process.group.config.name
         return 'processname:%s groupname:%s pid:%s\n%s' % (
             self.process.config.name,
@@ -110,7 +110,7 @@ class ProcessStateEvent(Event):
 
     def __str__(self):
         groupname = ''
-        if self.process.group is not None:
+        if self.process.group != None:
             groupname = self.process.group.config.name
         L = []
         L.append(('processname',  self.process.config.name))
@@ -221,7 +221,7 @@ class EventTypes:
     PROCESS_GROUP_REMOVED = ProcessGroupRemovedEvent
 
 def getEventNameByType(requested):
-    for name, typ in EventTypes.__dict__.items():
+    for name, typ in list(EventTypes.__dict__.items()):
         if typ is requested:
             return name
 

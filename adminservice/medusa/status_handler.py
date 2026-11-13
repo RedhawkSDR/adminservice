@@ -9,15 +9,15 @@ VERSION_STRING = "$Id: status_handler.py,v 1.7 2003/12/24 16:08:16 akuchling Exp
 import string
 import time
 import re
-from cgi import escape
+from html import escape
 
-import asyncore_25 as asyncore
-import http_server
-import medusa_gif
-import producers
-from counter import counter
+from . import asyncore_25 as asyncore
+from . import http_server
+from . import medusa_gif
+from . import producers
+from .counter import counter
 
-START_TIME = long(time.time())
+START_TIME = int(time.time())
 
 class status_extension:
     hit_counter = counter()
@@ -64,7 +64,7 @@ class status_extension:
         [path, params, query, fragment] = request.split_uri()
         self.hit_counter.increment()
         if path == self.statusdir:          # and not a subdirectory
-            up_time = ''.join(english_time(long(time.time()) - START_TIME))
+            up_time = ''.join(english_time(int(time.time()) - START_TIME))
             request['Content-Type'] = 'text/html'
             request.push (
                     '<html>'
@@ -77,8 +77,8 @@ class status_extension:
                 try:
                     request.push (self.objects[i].status())
                 except:
-                    import traceback, StringIO
-                    stream = StringIO.StringIO()
+                    import traceback, io
+                    stream = io.StringIO()
                     traceback.print_exc(None,stream)
                     request.push('<h2><font color="red">Error in Channel %3d: %s</font><pre>%s</pre>' % (i,escape(repr(self.objects[i])), escape(stream.getvalue())))
                 request.push ('<hr>\r\n')
@@ -124,7 +124,7 @@ class status_extension:
             request['Content-Length'] = len (message)
             request.push (message)
             now = int (time.time())
-            for channel in asyncore.socket_map.keys():
+            for channel in list(asyncore.socket_map.keys()):
                 if channel.__class__ == http_server.http_channel:
                     if channel != request.channel:
                         if (now - channel.creation_time) > channel.zombie_timeout:
@@ -138,7 +138,7 @@ class status_extension:
         elif self.allow_emergency_debug and path == self.statusdir + '/emergency_debug':
             request.push ('<html>Moving All Servers...</html>')
             request.done()
-            for channel in asyncore.socket_map.keys():
+            for channel in list(asyncore.socket_map.keys()):
                 if channel.accepting:
                     if type(channel.addr) is type(()):
                         ip, port = channel.addr
@@ -172,7 +172,7 @@ class status_extension:
         if not object in self.hyper_objects:
             self.hyper_objects.append (object)
 
-import logger
+from . import logger
 
 class logger_for_status (logger.tail_logger):
 
@@ -203,10 +203,7 @@ class lines_producer:
 
 class channel_list_producer (lines_producer):
     def __init__ (self, statusdir):
-        channel_reprs = map (
-                lambda x: '&lt;' + repr(x)[1:-1] + '&gt;',
-                asyncore.socket_map.values()
-                )
+        channel_reprs = ['&lt;' + repr(x)[1:-1] + '&gt;' for x in list(asyncore.socket_map.values())]
         channel_reprs.sort()
         lines_producer.__init__ (
                 self,
@@ -227,10 +224,10 @@ def html_repr (object):
         return so
 
 def html_reprs (list, front='', back=''):
-    reprs = map (
+    reprs = list(map (
             lambda x,f=front,b=back: '%s%s%s' % (f,x,b),
-            map (lambda x: escape (html_repr(x)), list)
-            )
+            [escape (html_repr(x)) for x in list]
+            ))
     reprs.sort()
     return reprs
 

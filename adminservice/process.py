@@ -6,7 +6,6 @@ import shlex
 import traceback
 import signal
 import subprocess
-from exceptions import Exception
 
 from adminservice.medusa import asyncore_25 as asyncore
 
@@ -66,17 +65,17 @@ class Subprocess:
         self.state = ProcessStates.STOPPED if config.is_enabled() else ProcessStates.DISABLED
 
     def removelogs(self):
-        for dispatcher in self.dispatchers.values():
+        for dispatcher in list(self.dispatchers.values()):
             if hasattr(dispatcher, 'removelogs'):
                 dispatcher.removelogs()
 
     def reopenlogs(self):
-        for dispatcher in self.dispatchers.values():
+        for dispatcher in list(self.dispatchers.values()):
             if hasattr(dispatcher, 'reopenlogs'):
                 dispatcher.reopenlogs()
 
     def drain(self):
-        for dispatcher in self.dispatchers.values():
+        for dispatcher in list(self.dispatchers.values()):
             # note that we *must* call readable() for every
             # dispatcher, as it may have side effects for a given
             # dispatcher (eg. call handle_listener_state_change for
@@ -91,7 +90,7 @@ class Subprocess:
             raise OSError(errno.EPIPE, "Process already closed")
 
         stdin_fd = self.pipes['stdin']
-        if stdin_fd is None:
+        if stdin_fd == None:
             raise OSError(errno.EPIPE, "Process has no stdin channel")
 
         dispatcher = self.dispatchers[stdin_fd]
@@ -109,7 +108,7 @@ class Subprocess:
             cmd = self.config.get_start_command()
             commandargs = shlex.split(cmd)
             self.config.options.logger.debug("Start command: %s" % cmd)
-        except ValueError, e:
+        except ValueError as e:
             raise BadCommand("can't parse command %r: %s" % \
                 (self.config.command, str(e)))
 
@@ -137,7 +136,7 @@ class Subprocess:
                     pass
                 else:
                     break
-            if st is None:
+            if st == None:
                 filename = program
             else:
                 filename = found
@@ -163,12 +162,12 @@ class Subprocess:
 
     def change_state(self, new_state, expected=True):
         old_state = self.state
-        if new_state is old_state:
+        if new_state == old_state:
             # exists for unit tests
             return False
 
         event_class = self.event_map.get(new_state)
-        if event_class is not None:
+        if event_class != None:
             event = event_class(self, old_state, expected)
             events.notify(event)
 
@@ -220,7 +219,7 @@ class Subprocess:
 
         try:
             filename, argv = self.get_execv_args()
-        except ProcessException, what:
+        except ProcessException as what:
             self.record_spawnerr(what.args[0])
             self._assertInState(ProcessStates.STARTING)
             self.change_state(ProcessStates.BACKOFF)
@@ -228,7 +227,7 @@ class Subprocess:
 
         try:
             self.dispatchers, self.pipes = self.config.make_dispatchers(self)
-        except (OSError, IOError), why:
+        except (OSError, IOError) as why:
             code = why.args[0]
             if code == errno.EMFILE:
                 # too many file descriptors open
@@ -243,7 +242,7 @@ class Subprocess:
 
         try:
             pid = options.fork()
-        except OSError, why:
+        except OSError as why:
             code = why.args[0]
             if code == errno.EAGAIN:
                 # process table full
@@ -323,22 +322,22 @@ class Subprocess:
             env = os.environ.copy()
             env['ADMINSERVICE_ENABLED'] = '1'
             serverurl = self.config.serverurl
-            if serverurl is None: # unset
+            if serverurl == None: # unset
                 serverurl = options.serverurl # might still be None
             if serverurl:
                 env['ADMINSERVICE_SERVER_URL'] = serverurl
             env['ADMINSERVICE_PROCESS_NAME'] = self.config.name
             if self.group:
                 env['ADMINSERVICE_GROUP_NAME'] = self.group.config.name
-            if self.config.environment is not None:
+            if self.config.environment != None:
                 env.update(self.config.environment)
 
             # change directory
             try:
                 cwd = self.config.directory
-                if cwd is not None:
+                if cwd != None:
                     options.chdir(cwd)
-            except OSError, why:
+            except OSError as why:
                 code = errno.errorcode.get(why.args[0], why.args[0])
                 msg = "couldn't chdir to %s: %s\n" % (cwd, code)
                 options.write(2, "adminservice: " + msg)
@@ -346,7 +345,7 @@ class Subprocess:
 
             # set umask, then execve
             try:
-                if self.config.umask is not None:
+                if self.config.umask != None:
                     options.setumask(self.config.umask)
                 self.config.alive = True
                 if self.config.run_detached:
@@ -369,7 +368,7 @@ class Subprocess:
                         # If there's a script to check if the config was started, run it now.
                         # The assumption is it will return when it can determine if the process
                         # is in either a good or bad state.
-                        if self.config.started_status_script is not None and not self.config.is_started():
+                        if self.config.started_status_script != None and not self.config.is_started():
                             raise "Bad start status for %s" % self.config.name
 
                     else:
@@ -392,10 +391,10 @@ class Subprocess:
                 else:
                     # This call won't return
                     options.execve(argv[0], argv, env)
-            except SystemExit, e:
+            except SystemExit as e:
                 # The fork called sys.exit, things are ok
                 exit_code = e.code
-            except OSError, why:
+            except OSError as why:
                 code = errno.errorcode.get(why.args[0], why.args[0])
                 self.config.alive = False
                 msg = "adminservice: couldn't exec %s: %s\n" % (argv[0], code)
@@ -409,7 +408,7 @@ class Subprocess:
 
             # this point should only be reached if execve failed or the spawnve'd process is finished.
             # the finally clause will exit the child process.
-        except Exception, e:
+        except Exception as e:
             options.write(2, "Exception spawning process: %s" % e)
         finally:
             if exit_code != 0:
@@ -426,7 +425,7 @@ class Subprocess:
         # admin service is shutting down, otherwise run the stop scripts
         shutting_down = (self.config.options.mood < AdminServiceStates.RUNNING)
         if (not shutting_down and self.config.run_detached) or not self.config.run_detached:
-            if self.config.stop_pre_script is not None:
+            if self.config.stop_pre_script != None:
                 script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.config.stop_pre_script) else '.', self.config.stop_pre_script)
                 pre_script = ('%s %s' % (script, self.config.output_redirect))
                 self.run_script(pre_script)
@@ -436,7 +435,7 @@ class Subprocess:
 
         if (not shutting_down and self.config.run_detached) or not self.config.run_detached:
             self.config.alive = False
-            if self.config.stop_post_script is not None:
+            if self.config.stop_post_script != None:
                 script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.config.stop_post_script) else '', self.config.stop_post_script)
                 post_script = ('%s %s' % (script, self.config.output_redirect))
                 self.run_script(post_script)
@@ -444,10 +443,10 @@ class Subprocess:
         return killval
 
     def run_script(self, script_to_run):
-        if script_to_run is not None:
+        if script_to_run != None:
             try:
                 os.system(script_to_run)
-            except OSError, e:
+            except OSError as e:
                 self.config.options.write(2, "adminservice: unable to execute script(s) %s: %s\n" % (script_to_run, repr(e)))
             except:
                 (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
@@ -456,7 +455,7 @@ class Subprocess:
                 self.config.options.write(2, msg)
 
     def query(self):
-        if self.config.query_script is not None:
+        if self.config.query_script != None:
             try:
                 shell = False if os.path.isdir(self.config.query_script) else True
                 args = ['/usr/bin/run-parts'] if not shell else []
@@ -465,8 +464,8 @@ class Subprocess:
                 # send in preexec_fn to change user to uid/gid
                 proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell, preexec_fn=self.set_uid)
                 comm = proc.communicate()
-                return "%s%s" % (comm[0], comm[1] if comm[1] is not None else '')
-            except OSError, e:
+                return "%s%s" % (comm[0], comm[1] if comm[1] != None else '')
+            except OSError as e:
                 self.config.options.write(2, "adminservice: unable to execute query(s) %s: %s\n" % (self.config.query_script, repr(e)))
             except:
                 (fil, fun, line), t,v,tbinfo = asyncore.compact_traceback()
@@ -508,9 +507,9 @@ class Subprocess:
             try:
                 detached_pid = integer(self.config.get_pid())
                 options.logger.debug("Found detached pid %s for native pid %s" % (detached_pid, self.pid))
-            except Exception, e:
+            except Exception as e:
                 stop_command = self.config.get_stop_command()
-                if stop_command is not None:
+                if stop_command != None:
                     options.logger.debug("Pid file isn't an integer, using stop command instead %s for %s" % (stop_command, self.pid))
                 else:
                     raise e
@@ -564,7 +563,7 @@ class Subprocess:
             pid = -self.pid
 
         try:
-            if detached_pid is not None:
+            if detached_pid != None:
                 if shutdown:
                     options.logger.info("Leaving %s(%d) running, system is shutting down" % (self.config.name, detached_pid))
                 else:
@@ -574,9 +573,9 @@ class Subprocess:
                         if os.path.exists(self.config.pid_file) and not self.config.check_status():
                             options.logger.trace("Removing %s after killing detached process" % self.config.pid_file)
                             os.remove(self.config.pid_file)
-                    except Exception, e:
+                    except Exception as e:
                         options.logger.warn("Problem killing detached pid %d: %s" % (detached_pid, e))
-            if stop_command is not None:
+            if stop_command != None:
                 if shutdown:
                     options.logger.info("Leaving %s(%d) running, system is shutting down" % (self.config.name, pid))
                 else:
@@ -586,7 +585,7 @@ class Subprocess:
                         if os.path.exists(self.config.pid_file) and not self.config.check_status():
                             options.logger.trace("Removing %s after killing detached process" % self.config.pid_file)
                             os.remove(self.config.pid_file)
-                    except Exception, e:
+                    except Exception as e:
                         options.logger.warn("Problem running stop command for %s: %s" % (pid, e))
             options.logger.info("Sending %s to pid %s" % (sig, pid))
             options.kill(pid, sig)
@@ -722,14 +721,14 @@ class Subprocess:
         # if we died before we processed the current event (only happens
         # if we're an event listener), notify the event system that this
         # event was rejected so it can be processed again.
-        if self.event is not None:
+        if self.event != None:
             # Note: this should only be true if we were in the BUSY
             # state when finish() was called.
             events.notify(events.EventRejectedEvent(self, self.event))
             self.event = None
 
     def set_uid(self):
-        if self.config.uid is None:
+        if self.config.uid == None:
             return
         msg = self.config.options.drop_privileges(self.config.uid, self.config.gid)
         return msg
@@ -757,7 +756,7 @@ class Subprocess:
             # dont start any processes if adminservice is shutting down
             if state == ProcessStates.EXITED:
                 if self.config.is_enabled() and self.config.autorestart:
-                    if self.config.autorestart is RestartUnconditionally:
+                    if self.config.autorestart == RestartUnconditionally:
                         # EXITED -> STARTING
                         self.spawn()
                     else: # autorestart is RestartWhenExitUnexpected
@@ -843,7 +842,7 @@ class FastCGISubprocess(Subprocess):
         """
         The FastCGI socket needs to be created by the parent before we fork
         """
-        if self.group is None:
+        if self.group == None:
             raise NotImplementedError('No group set for FastCGISubprocess')
         if not hasattr(self.group, 'socket_manager'):
             raise NotImplementedError('No SocketManager set for '
@@ -856,7 +855,7 @@ class FastCGISubprocess(Subprocess):
         """
         self.before_spawn()
         pid = Subprocess.spawn(self)
-        if pid is None:
+        if pid == None:
             #Remove object reference to decrement the reference count on error
             self.fcgi_sock = None
         return pid
@@ -909,15 +908,15 @@ class ProcessGroupBase:
                                                  self.config.name)
 
     def removelogs(self):
-        for process in self.processes.values():
+        for process in list(self.processes.values()):
             process.removelogs()
 
     def reopenlogs(self):
-        for process in self.processes.values():
+        for process in list(self.processes.values()):
             process.reopenlogs()
 
     def stop_all(self):
-        processes = self.processes.values()
+        processes = list(self.processes.values())
         processes.sort()
         processes.reverse() # stop in desc priority order
 
@@ -935,12 +934,12 @@ class ProcessGroupBase:
 
     def get_unstopped_processes(self):
         """ Processes which aren't in a state that is considered 'stopped' """
-        return [ x for x in self.processes.values() if x.get_state() not in
+        return [ x for x in list(self.processes.values()) if x.get_state() not in
                  ALL_STOPPED_STATES ]
 
     def get_dispatchers(self):
         dispatchers = {}
-        for process in self.processes.values():
+        for process in list(self.processes.values()):
             dispatchers.update(process.dispatchers)
         return dispatchers
 
@@ -949,7 +948,7 @@ class ProcessGroupBase:
 
 class ProcessGroup(ProcessGroupBase):
     def transition(self):
-        procs = self.processes.values()[:]
+        procs = list(self.processes.values())[:]
         procs.sort()
         last_state = None
 
@@ -957,14 +956,14 @@ class ProcessGroup(ProcessGroupBase):
             logger = proc.config.options.logger
 
             # If we're not the first process in the group, check if we need to wait for the previous ones to start
-            if last_state is not None and proc.get_state() in STOPPED_STATES:
+            if last_state != None and proc.get_state() in STOPPED_STATES:
                 previous_state = last_state[0]
 
-                if previous_state in RUNNING_STATES and proc.waits_left is None:
+                if previous_state in RUNNING_STATES and proc.waits_left == None:
                     proc.waits_left = proc.config.waitforprevious
 
                 # If this process isn't configured to wait, don't bother with these transitions
-                if proc.waits_left is not None and previous_state != ProcessStates.RUNNING:
+                if proc.waits_left != None and previous_state != ProcessStates.RUNNING:
                     # Need to wait if we have a wait time set, the previous process is in the STARTING state and
                     # this process is in the STOPPED state
                     if proc.waits_left > 0 and previous_state == ProcessStates.STARTING:
@@ -984,7 +983,7 @@ class ProcessGroup(ProcessGroupBase):
 
             # If we're not the first process and we're disabled, we still need to spawn a status thread if its running.
             # Check that the previous state is STARTING, if it is, wait for that to finish before we try to status this process
-            elif last_state is not None and last_state[0] == ProcessStates.STARTING and proc.get_state() == ProcessStates.DISABLED:
+            elif last_state != None and last_state[0] == ProcessStates.STARTING and proc.get_state() == ProcessStates.DISABLED:
                 logger.trace("%s is disabled, previous process is starting. Waiting for previous to transition"
                              % proc.config.name)
                 return
@@ -1004,7 +1003,7 @@ class FastCGIProcessGroup(ProcessGroup):
         # to fail early during start up if there is a config error
         try:
             self.socket_manager.get_socket()
-        except Exception, e:
+        except Exception as e:
             raise ValueError('Could not create FastCGI socket %s: %s' % (self.socket_manager.config(), e))
 
 class EventListenerPool(ProcessGroupBase):
@@ -1018,13 +1017,13 @@ class EventListenerPool(ProcessGroupBase):
 
     def handle_rejected(self, event):
         process = event.process
-        procs = self.processes.values()
+        procs = list(self.processes.values())
         if process in procs: # this is one of our processes
             # rebuffer the event
             self._acceptEvent(event.event, head=True)
 
     def transition(self):
-        processes = self.processes.values()
+        processes = list(self.processes.values())
         dispatch_capable = False
         for process in processes:
             process.transition()
@@ -1062,7 +1061,7 @@ class EventListenerPool(ProcessGroupBase):
             event.serial = new_serial(GlobalSerial)
         if not hasattr(event, 'pool_serials'):
             event.pool_serials = {}
-        if not event.pool_serials.has_key(self.config.name):
+        if self.config.name not in event.pool_serials:
             event.pool_serials[self.config.name] = new_serial(self)
         else:
             self.config.options.logger.debug(
@@ -1085,7 +1084,7 @@ class EventListenerPool(ProcessGroupBase):
     def _dispatchEvent(self, event):
         pool_serial = event.pool_serials[self.config.name]
 
-        for process in self.processes.values():
+        for process in list(self.processes.values()):
             if process.state != ProcessStates.RUNNING:
                 continue
             if process.listener_state == EventListenerStates.READY:
@@ -1096,7 +1095,7 @@ class EventListenerPool(ProcessGroupBase):
                     envelope = self._eventEnvelope(event_type, serial,
                                                    pool_serial, payload)
                     process.write(envelope)
-                except OSError, why:
+                except OSError as why:
                     if why.args[0] != errno.EPIPE:
                         raise
                     continue
@@ -1145,7 +1144,7 @@ class GlobalSerial(object):
 GlobalSerial = GlobalSerial() # singleton
 
 def new_serial(inst):
-    if inst.serial == sys.maxint:
+    if inst.serial == sys.maxsize:
         inst.serial = -1
     inst.serial += 1
     return inst.serial
@@ -1175,9 +1174,9 @@ def daemonize(directory, umask, argv, env, stdin='/dev/null', stdout='/dev/null'
 
 
     # Decouple from parent environment.
-    if directory is not None:
+    if directory != None:
         os.chdir(directory)
-    if umask is not None:
+    if umask != None:
         os.umask(integer(umask))
     os.setsid() 
 

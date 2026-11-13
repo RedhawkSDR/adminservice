@@ -86,6 +86,7 @@ class async_chat (asyncore.dispatcher):
 
         try:
             data = self.recv (self.ac_in_buffer_size)
+            data = data.decode("utf-8")
         except socket.error:
             self.handle_error()
             return
@@ -104,7 +105,7 @@ class async_chat (asyncore.dispatcher):
                 # no terminator, collect it all
                 self.collect_incoming_data (self.ac_in_buffer)
                 self.ac_in_buffer = ''
-            elif isinstance(terminator, int) or isinstance(terminator, long):
+            elif isinstance(terminator, int) or isinstance(terminator, int):
                 # numeric terminator
                 n = terminator
                 if lb < n:
@@ -188,7 +189,7 @@ class async_chat (asyncore.dispatcher):
                 p = self.producer_fifo.first()
                 # a 'None' in the producer fifo is a sentinel,
                 # telling us to close the channel.
-                if p is None:
+                if p == None:
                     if not self.ac_out_buffer:
                         self.producer_fifo.pop()
                         self.close()

@@ -16,19 +16,19 @@ import sys
 import time
 
 # async modules
-import asyncore_25 as asyncore
-import asynchat_25 as asynchat
+from . import asyncore_25 as asyncore
+from . import asynchat_25 as asynchat
 
 # medusa modules
-import http_date
-import producers
-import status_handler
-import logger
+from . import http_date
+from . import producers
+from . import status_handler
+from . import logger
 
 VERSION_STRING = RCS_ID.split()[2]
 
-from counter import counter
-from urllib import unquote, splitquery
+from .counter import counter
+from urllib.parse import unquote, splitquery
 
 # ===========================================================================
 #                                                       Request Object
@@ -86,12 +86,12 @@ class http_request:
         return key in self.reply_headers
 
     def has_key (self, key):
-        return self.reply_headers.has_key (key)
+        return key in self.reply_headers
 
     def build_reply_header (self):
         return '\r\n'.join(
                     [self.response(self.reply_code)] +
-                    map(lambda x: '%s: %s' % x, self.reply_headers.items())
+                    ['%s: %s' % x for x in list(self.reply_headers.items())]
                 ) + '\r\n\r\n'
 
     ####################################################
@@ -127,14 +127,14 @@ class http_request:
         found_it = 0
 
         # Remove things from the old dict as well
-        if (self.reply_headers.has_key(name) and
-            (value is None or
+        if (name in self.reply_headers and
+            (value == None or
              self.reply_headers[name] == value)):
             del self.reply_headers[name]
             found_it = 1
 
 
-        if not value is None:
+        if not value == None:
             if (name, value) in self.__reply_header_list:
                 removed_headers = [(name, value)]
                 found_it = 1
@@ -146,7 +146,7 @@ class http_request:
                     found_it = 1
 
         if not found_it:
-            if value is None:
+            if value == None:
                 search_value = "%s" % name
             else:
                 search_value = "%s: %s" % (name, value)
@@ -168,7 +168,7 @@ class http_request:
         # that would have overwritten the dict entry
         # if the dict was the only storage...
         header_names = [n for n,v in header_tuples]
-        for n,v in self.reply_headers.items():
+        for n,v in list(self.reply_headers.items()):
             if n not in header_names:
                 header_tuples.append((n,v))
                 header_names.append(n)
@@ -209,7 +209,7 @@ class http_request:
             )
 
     def split_uri (self):
-        if self._split_uri is None:
+        if self._split_uri == None:
             m = self.path_regex.match (self.uri)
             if m.end() != len(self.uri):
                 raise ValueError("Broken URI")
@@ -227,7 +227,7 @@ class http_request:
     def get_header (self, header):
         header = header.lower()
         hc = self._header_cache
-        if not hc.has_key (header):
+        if header not in hc:
             h = header + ': '
             hl = len(h)
             for line in self.header:
@@ -306,7 +306,7 @@ class http_request:
 
         if self.version == '1.0':
             if connection == 'keep-alive':
-                if not self.has_key ('Content-Length'):
+                if 'Content-Length' not in self:
                     close_it = 1
                 else:
                     self['Connection'] = 'Keep-Alive'
@@ -315,8 +315,8 @@ class http_request:
         elif self.version == '1.1':
             if connection == 'close':
                 close_it = 1
-            elif not self.has_key ('Content-Length'):
-                if self.has_key ('Transfer-Encoding'):
+            elif 'Content-Length' not in self:
+                if 'Transfer-Encoding' in self:
                     if not self['Transfer-Encoding'] == 'chunked':
                         close_it = 1
                 elif self.use_chunked:
@@ -324,7 +324,7 @@ class http_request:
                     wrap_in_chunking = 1
                 else:
                     close_it = 1
-        elif self.version is None:
+        elif self.version == None:
             # Although we don't *really* support http/0.9 (because we'd have to
             # use \r\n as a terminator, and it would just yuck up a lot of stuff)
             # it's very common for developers to not want to type a version number
@@ -503,7 +503,7 @@ class http_channel (asynchat.async_chat):
 
     def kill_zombies (self):
         now = int (time.time())
-        for channel in asyncore.socket_map.values():
+        for channel in list(asyncore.socket_map.values()):
             if channel.__class__ == self.__class__:
                 if (now - channel.last_used) > channel.zombie_timeout:
                     channel.close()
@@ -537,7 +537,7 @@ class http_channel (asynchat.async_chat):
 
     def handle_error (self):
         t, v = sys.exc_info()[:2]
-        if t is SystemExit:
+        if t == SystemExit:
             raise t(v)
         else:
             asynchat.async_chat.handle_error (self)
@@ -598,7 +598,7 @@ class http_channel (asynchat.async_chat):
             self.request_counter.increment()
             self.server.total_requests.increment()
 
-            if command is None:
+            if command == None:
                 self.log_info ('Bad HTTP request: %s' % repr(request), 'error')
                 r.error (400)
                 return
@@ -754,7 +754,7 @@ class http_server (asyncore.dispatcher):
         def nice_bytes (n):
             return ''.join(status_handler.english_bytes(n))
 
-        handler_stats = filter (None, map (maybe_status, self.handlers))
+        handler_stats = [_f for _f in map (maybe_status, self.handlers) if _f]
 
         if self.total_clients:
             ratio = self.total_requests.as_long() / float(self.total_clients.as_long())
@@ -827,16 +827,16 @@ def crack_request (r):
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 2:
-        print 'usage: %s <root> <port>' % (sys.argv[0])
+        print('usage: %s <root> <port>' % (sys.argv[0]))
     else:
         import monitor
-        import filesys
-        import default_handler
-        import status_handler
+        from . import filesys
+        from . import default_handler
+        from . import status_handler
         import ftp_server
         import chat_server
         import resolver
-        import logger
+        from . import logger
         rs = resolver.caching_resolver ('127.0.0.1')
         lg = logger.file_logger (sys.stdout)
         ms = monitor.secure_monitor_server ('fnord', '127.0.0.1', 9999)

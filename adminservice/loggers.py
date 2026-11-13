@@ -39,7 +39,7 @@ class LevelsByDescription:
 
 def _levelNumbers():
     bynumber = {}
-    for name, number in LevelsByName.__dict__.items():
+    for name, number in list(LevelsByName.__dict__.items()):
         if not name.startswith('_'):
             bynumber[number] = name
     return bynumber
@@ -62,7 +62,7 @@ class Handler:
     def flush(self):
         try:
             self.stream.flush()
-        except IOError, why:
+        except IOError as why:
             # if adminservice output is piped, EPIPE can be raised at exit
             if why.args[0] != errno.EPIPE:
                 raise
@@ -106,7 +106,7 @@ class FileHandler(Handler):
     def remove(self):
         try:
             os.remove(self.baseFilename)
-        except OSError, why:
+        except OSError as why:
             if why.args[0] != errno.ENOENT:
                 raise
 
@@ -189,13 +189,13 @@ class RotatingFileHandler(FileHandler):
         if os.path.exists(dfn):
             try:
                 os.remove(dfn)
-            except OSError, why:
+            except OSError as why:
                 # catch race condition (destination already deleted)
                 if why.args[0] != errno.ENOENT:
                     raise
         try:
             os.rename(sfn, dfn)
-        except OSError, why:
+        except OSError as why:
             # catch exceptional condition (source deleted)
             # E.g. cleanup script removes active log.
             if why.args[0] != errno.ENOENT:
@@ -232,7 +232,7 @@ class LogRecord:
     def asdict(self):
         if self.dictrepr is None:
             now = time.time()
-            msecs = (now - long(now)) * 1000
+            msecs = (now - int(now)) * 1000
             part1 = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now))
             asctime = '%s,%03d' % (part1, msecs)
             levelname = LOG_LEVELS_BY_NUM[self.level]

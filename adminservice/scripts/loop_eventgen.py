@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # A process which emits a process communications event on its stdout,
 # and subsequently waits for a line to be sent back to its stdin by

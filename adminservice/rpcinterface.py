@@ -110,12 +110,12 @@ class AdminServiceNamespaceRPCInterface:
 
         logfile = self.adminserviced.options.logfile
 
-        if logfile is None or not os.path.exists(logfile):
+        if logfile == None or not os.path.exists(logfile):
             raise RPCError(Faults.NO_FILE, logfile)
 
         try:
             return readFile(logfile, int(offset), int(length))
-        except ValueError, inst:
+        except ValueError as inst:
             why = inst.args[0]
             raise RPCError(getattr(Faults, why))
 
@@ -129,7 +129,7 @@ class AdminServiceNamespaceRPCInterface:
         self._update('clearLog')
 
         logfile = self.adminserviced.options.logfile
-        if logfile is None or not self.adminserviced.options.exists(logfile):
+        if logfile == None or not self.adminserviced.options.exists(logfile):
             raise RPCError(Faults.NO_FILE)
 
         # there is a race condition here, but ignore it.
@@ -183,7 +183,7 @@ class AdminServiceNamespaceRPCInterface:
         self._update('reloadConfig')
         try:
             self.adminserviced.options.process_config(do_usage=False)
-        except ValueError, msg:
+        except ValueError as msg:
             raise RPCError(Faults.CANT_REREAD, msg)
 
         added, changed, removed = self.adminserviced.diff_to_active()
@@ -230,11 +230,11 @@ class AdminServiceNamespaceRPCInterface:
         all_processes = []
 
         if lexical:
-            group_names = self.adminserviced.process_groups.keys()
+            group_names = list(self.adminserviced.process_groups.keys())
             group_names.sort()
             for group_name in group_names:
                 group = self.adminserviced.process_groups[group_name]
-                process_names = group.processes.keys()
+                process_names = list(group.processes.keys())
                 process_names.sort()
                 if reverse:
                     process_names.reverse()
@@ -242,11 +242,11 @@ class AdminServiceNamespaceRPCInterface:
                     process = group.processes[process_name]
                     all_processes.append((group, process))
         else:
-            groups = self.adminserviced.process_groups.values()
+            groups = list(self.adminserviced.process_groups.values())
             groups.sort() # asc by priority
 
             for group in groups:
-                processes = group.processes.values()
+                processes = list(group.processes.values())
                 processes.sort() # asc by priority
                 if reverse:
                     processes.reverse()
@@ -260,14 +260,14 @@ class AdminServiceNamespaceRPCInterface:
         group_name, process_name = split_namespec(name)
 
         group = self.adminserviced.process_groups.get(group_name)
-        if group is None:
+        if group == None:
             raise RPCError(Faults.BAD_NAME, name)
 
-        if process_name is None:
+        if process_name == None:
             return group, None
 
         process = group.processes.get(process_name)
-        if process is None:
+        if process == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         return group, process
@@ -283,7 +283,7 @@ class AdminServiceNamespaceRPCInterface:
         """
         self._update('startProcess')
         group, process = self._getGroupAndProcess(name)
-        if process is None:
+        if process == None:
             group_name, process_name = split_namespec(name)
             return self.startProcessGroup(group_name, force, wait)
         elif not boolean(force) and not process.config.is_enabled():
@@ -298,9 +298,9 @@ class AdminServiceNamespaceRPCInterface:
         # eventually fail
         try:
             filename, argv = process.get_execv_args()
-        except NotFound, why:
+        except NotFound as why:
             raise RPCError(Faults.NO_FILE, why.args[0])
-        except (NotExecutable, NoPermission), why:
+        except (NotExecutable, NoPermission) as why:
             raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
 
         process.spawn()
@@ -364,11 +364,11 @@ class AdminServiceNamespaceRPCInterface:
 
         group = self.adminserviced.process_groups.get(name)
 
-        if group is None:
+        if group == None:
             raise RPCError(Faults.BAD_NAME, name)
 
-        force = boolean(force) if force is not None else False
-        processes = group.processes.values()
+        force = boolean(force) if force != None else False
+        processes = list(group.processes.values())
         processes.sort()
         processes = [ (group, process) for process in processes]
 
@@ -407,12 +407,12 @@ class AdminServiceNamespaceRPCInterface:
 
         group = None
         process = None
-        if kwargs.has_key('process'):
+        if 'process' in kwargs:
             process = kwargs['process']
         else:
             group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             group_name, process_name = split_namespec(name)
             return self.stopProcessGroup(group_name, wait)
 
@@ -420,7 +420,7 @@ class AdminServiceNamespaceRPCInterface:
             raise RPCError(Faults.NOT_RUNNING, name)
 
         msg = process.stop()
-        if msg is not None:
+        if msg != None:
             raise RPCError(Faults.FAILED, msg)
 
         # We'll try to reap any killed child. FWIW, reap calls waitpid, and
@@ -463,7 +463,7 @@ class AdminServiceNamespaceRPCInterface:
 
         group = self.adminserviced.process_groups.get(name)
 
-        if group is None:
+        if group == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         # Get the new process configuration for the group
@@ -481,7 +481,7 @@ class AdminServiceNamespaceRPCInterface:
             self.adminserviced.remove_process_group(group)
             return
         
-        oldProcs = group.processes.values()
+        oldProcs = list(group.processes.values())
         oldProcs.sort()
         oldProcs.reverse()
 
@@ -494,7 +494,7 @@ class AdminServiceNamespaceRPCInterface:
         # Save the new config and return the current process names
         config.after_setuid()
         self.adminserviced.process_groups[name] = config.make_group()
-        procs = self.adminserviced.process_groups[name].processes.values()
+        procs = list(self.adminserviced.process_groups[name].processes.values())
         procs.sort()
         return [ proc.config.name for proc in procs ]
 
@@ -509,10 +509,10 @@ class AdminServiceNamespaceRPCInterface:
 
         group = self.adminserviced.process_groups.get(name)
 
-        if group is None:
+        if group == None:
             raise RPCError(Faults.BAD_NAME, name)
 
-        processes = group.processes.values()
+        processes = list(group.processes.values())
         processes.sort()
         processes.reverse()
         processes = [ (group, process) for process in processes ]
@@ -553,7 +553,7 @@ class AdminServiceNamespaceRPCInterface:
 
         group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             group_name, process_name = split_namespec(name)
             return self.signalProcessGroup(group_name, signal=signal)
 
@@ -567,7 +567,7 @@ class AdminServiceNamespaceRPCInterface:
 
         msg = process.signal(sig)
 
-        if not msg is None:
+        if not msg == None:
             raise RPCError(Faults.FAILED, msg)
 
         return True
@@ -582,10 +582,10 @@ class AdminServiceNamespaceRPCInterface:
         self._update('signalProcessGroup')
 
         group = self.adminserviced.process_groups.get(name)
-        if group is None:
+        if group == None:
             raise RPCError(Faults.BAD_NAME, name)
 
-        processes = group.processes.values()
+        processes = list(group.processes.values())
         processes.sort()
         processes = [(group, process) for process in processes]
 
@@ -619,11 +619,11 @@ class AdminServiceNamespaceRPCInterface:
         """
         self._update('queryProcess')
         group, process = self._getGroupAndProcess(name)
-        if process is None:
+        if process == None:
             group_name, process_name = split_namespec(name)
             return self.queryProcessGroup(group_name)
 
-        if process.config.query_script is not None:
+        if process.config.query_script != None:
             output = process.query()
         else:
             output = "%s is in the %s state" % (name, getProcessStateDescription(process.get_state()))
@@ -641,10 +641,10 @@ class AdminServiceNamespaceRPCInterface:
 
         group = self.adminserviced.process_groups.get(name)
 
-        if group is None:
+        if group == None:
             raise RPCError(Faults.BAD_NAME, name)
 
-        processes = group.processes.values()
+        processes = list(group.processes.values())
         processes.sort()
         processes = [ (group, process) for process in processes]
 
@@ -699,8 +699,8 @@ class AdminServiceNamespaceRPCInterface:
                       'group_prio': gconfig.priority,
                       'process_prio': pconfig.priority }
                 if full:
-                    for key, val in pconfig.__dict__.items():
-                        if val is not None:
+                    for key, val in list(pconfig.__dict__.items()):
+                        if val != None:
                             cfg['config_%s' % key] = str(val)
                 configinfo.append(cfg)
 
@@ -748,7 +748,7 @@ class AdminServiceNamespaceRPCInterface:
 
         group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         # TODO timestamps are returned as xml-rpc integers for b/c but will
@@ -808,17 +808,17 @@ class AdminServiceNamespaceRPCInterface:
     def _readProcessLog(self, name, offset, length, channel):
         group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         logfile = getattr(process.config, '%s_logfile' % channel)
 
-        if logfile is None or not os.path.exists(logfile):
+        if logfile == None or not os.path.exists(logfile):
             raise RPCError(Faults.NO_FILE, logfile)
 
         try:
             return readFile(logfile, int(offset), int(length))
-        except ValueError, inst:
+        except ValueError as inst:
             why = inst.args[0]
             raise RPCError(getattr(Faults, why))
 
@@ -849,12 +849,12 @@ class AdminServiceNamespaceRPCInterface:
     def _tailProcessLog(self, name, offset, length, channel):
         group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         logfile = getattr(process.config, '%s_logfile' % channel)
 
-        if logfile is None or not os.path.exists(logfile):
+        if logfile == None or not os.path.exists(logfile):
             return ['', 0, False]
 
         return tailFile(logfile, int(offset), int(length))
@@ -916,7 +916,7 @@ class AdminServiceNamespaceRPCInterface:
 
         group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         try:
@@ -951,7 +951,7 @@ class AdminServiceNamespaceRPCInterface:
             name = make_namespec(group.config.name, process.config.name)
             try:
                 callback(name)
-            except RPCError, e:
+            except RPCError as e:
                 results.append(
                     {'name':process.config.name,
                      'group':group.config.name,
@@ -989,15 +989,15 @@ class AdminServiceNamespaceRPCInterface:
         """
         self._update('sendProcessStdin')
 
-        if isinstance(chars, unicode):
+        if isinstance(chars, str):
             chars = chars.encode('utf-8')
 
-        if not isinstance(chars, basestring):
+        if not isinstance(chars, str):
             raise RPCError(Faults.INCORRECT_PARAMETERS, chars)
 
         group, process = self._getGroupAndProcess(name)
 
-        if process is None:
+        if process == None:
             raise RPCError(Faults.BAD_NAME, name)
 
         if not process.pid or process.killing:
@@ -1005,7 +1005,7 @@ class AdminServiceNamespaceRPCInterface:
 
         try:
             process.write(chars)
-        except OSError, why:
+        except OSError as why:
             if why.args[0] == errno.EPIPE:
                 raise RPCError(Faults.NO_FILE, name)
             else:
@@ -1021,9 +1021,9 @@ class AdminServiceNamespaceRPCInterface:
         @param  string  data  Data for the event body
         @return boolean       Always return True unless error
         """
-        if isinstance(type, unicode):
+        if isinstance(type, str):
             type = type.encode('utf-8')
-        if isinstance(data, unicode):
+        if isinstance(data, str):
             data = data.encode('utf-8')
 
         notify(
@@ -1053,9 +1053,9 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
         ):
 
         if not callbacks:
-            proc_type = extra_kwargs['proc_type'] if extra_kwargs.has_key('proc_type') else ''
+            proc_type = extra_kwargs['proc_type'] if 'proc_type' in extra_kwargs else ''
             filter_string = None
-            if extra_kwargs.has_key('filter_string'):
+            if 'filter_string' in extra_kwargs:
                 filter_string = extra_kwargs['filter_string']
                 extra_kwargs.pop('filter_string')
 
@@ -1066,7 +1066,7 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
                 if predicate(process):
                     try:
                         callback = func(name, **extra_kwargs)
-                    except RPCError, e:
+                    except RPCError as e:
                         results.append({'name':process.config.name,
                                         'group':group.config.name,
                                         'status':e.code,
@@ -1079,10 +1079,10 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
                              'group':group.config.name,
                              'status':Faults.SUCCESS,
                              'description':'OK'}
-                        if isinstance(callback, basestring):
+                        if isinstance(callback, str):
                             ret['output'] = callback
                         results.append(ret)
-                elif filter_string is not None:
+                elif filter_string != None:
                     results.append(
                         {'name':process.config.name,
                          'group':group.config.name,
@@ -1098,7 +1098,7 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
 
             try:
                 value = cb()
-            except RPCError, e:
+            except RPCError as e:
                 results.append(
                     {'name':process.config.name,
                      'group':group.config.name,
@@ -1106,7 +1106,7 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
                      'description':e.text})
                 callbacks.remove(struct)
             else:
-                if value is not NOT_DONE_YET:
+                if value != NOT_DONE_YET:
                     results.append(
                         {'name':process.config.name,
                          'group':group.config.name,
@@ -1180,7 +1180,7 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
                         os.remove(process.config.pid_file)
     
                     try:
-                        if last_state is not None:
+                        if last_state != None:
                             timed_out = wait_transition(last_state[0], last_state[1], process)
                         if timed_out:
                             results.append({'name':process.config.name,
@@ -1194,7 +1194,7 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
 
                         last_state = (process.state, process)
 
-                    except RPCError, e:
+                    except RPCError as e:
                         results.append({'name':process.config.name,
                                         'group':group.config.name,
                                         'status':e.code,
@@ -1224,7 +1224,7 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
 
             try:
                 value = cb()
-            except RPCError, e:
+            except RPCError as e:
                 results.append(
                     {'name':process.config.name,
                      'group':group.config.name,
@@ -1232,7 +1232,7 @@ def make_startallfunc(processes, predicate, func, **extra_kwargs):
                      'description':e.text})
                 callbacks.remove(struct)
             else:
-                if value is not NOT_DONE_YET:
+                if value != NOT_DONE_YET:
                     results.append(
                         {'name':process.config.name,
                          'group':group.config.name,
@@ -1256,7 +1256,7 @@ def wait_transition(last_state, last_proc, new_proc):
     # Check if the new process' config has waiting enabled
     # - And the last state of the previous process is in STARTING
     # - And the current state is one we want to start from
-    if new_proc.config.waitforprevious is not None and last_state == ProcessStates.STARTING and new_proc.get_state() in waitable_states:
+    if new_proc.config.waitforprevious != None and last_state == ProcessStates.STARTING and new_proc.get_state() in waitable_states:
         timed_out = new_proc.config.waitforprevious
 
         # Loop for new_proc.config.waitforprevious seconds, check each second

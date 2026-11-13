@@ -1,4 +1,4 @@
-import ConfigParser
+import configparser
 import socket
 import getopt
 import os
@@ -7,7 +7,7 @@ import tempfile
 import errno
 import signal
 import re
-import xmlrpclib
+import xmlrpc.client as xmlrpc_client
 import pwd
 import grp
 import resource
@@ -111,7 +111,7 @@ class Options:
         self.defaultssearchpaths = defaultssearchpaths
 
         self.environ_expansions = {}
-        for k, v in os.environ.items():
+        for k, v in list(os.environ.items()):
             self.environ_expansions['ENV_%s' % k] = v
 
     def default_configfile(self, searchpaths):
@@ -121,7 +121,7 @@ class Options:
             if os.path.exists(path):
                 config = path
                 break
-        if config is None and self.require_configfile:
+        if config == None and self.require_configfile:
             self.usage('No config file found at default paths (%s); '
                        'use the -c option to specify a config file '
                        'at a different path' % ', '.join(searchpaths))
@@ -177,8 +177,8 @@ class Options:
         env=...      -- if not None, name of environment variable that
                         overrides the configuration file or default
         """
-        if flag is not None:
-            if handler is not None:
+        if flag != None:
+            if handler != None:
                 raise ValueError("use at most one of flag= and handler=")
             if not long and not short:
                 raise ValueError("flag= requires a command line flag")
@@ -200,7 +200,7 @@ class Options:
             if rest not in ("", ":"):
                 raise ValueError("short option should be 'x' or 'x:'")
             key = "-" + key
-            if self.options_map.has_key(key):
+            if key in self.options_map:
                 raise ValueError("duplicate short option key '%s'" % key)
             self.options_map[key] = (name, handler)
             self.short_options.append(short)
@@ -212,7 +212,7 @@ class Options:
             if key[-1] == "=":
                 key = key[:-1]
             key = "--" + key
-            if self.options_map.has_key(key):
+            if key in self.options_map:
                 raise ValueError("duplicate long option key '%s'" % key)
             self.options_map[key] = (name, handler)
             self.long_options.append(long)
@@ -224,7 +224,7 @@ class Options:
             if not hasattr(self, name):
                 setattr(self, name, None)
             self.names_list.append((name, confname))
-            if default is not None:
+            if default != None:
                 self.default_map[name] = default
             if required:
                 self.required_map[name] = required
@@ -246,11 +246,11 @@ class Options:
         doc      -- usage message (default is __main__.__doc__)
         """
         # Provide dynamic default method arguments
-        if args is None:
+        if args == None:
             args = sys.argv[1:]
-        if progname is None:
+        if progname == None:
             progname = sys.argv[0]
-        if doc is None:
+        if doc == None:
             import __main__
             doc = __main__.__doc__
         self.progname = progname
@@ -263,7 +263,7 @@ class Options:
         try:
             self.options, self.args = getopt.getopt(
                 args, "".join(self.short_options), self.long_options)
-        except getopt.error, exc:
+        except getopt.error as exc:
             self.usage(str(exc))
 
         # Check for positional args
@@ -273,31 +273,31 @@ class Options:
         # Process options returned by getopt
         for opt, arg in self.options:
             name, handler = self.options_map[opt]
-            if handler is not None:
+            if handler != None:
                 try:
                     arg = handler(arg)
-                except ValueError, msg:
+                except ValueError as msg:
                     self.usage("invalid value for %s %r: %s" % (opt, arg, msg))
-            if name and arg is not None:
-                if getattr(self, name) is not None:
+            if name and arg != None:
+                if getattr(self, name) != None:
                     self.usage("conflicting command line option %r" % opt)
                 self._set(name, arg, 2)
 
         # Process environment variables
-        for envvar in self.environ_map.keys():
+        for envvar in list(self.environ_map.keys()):
             name, handler = self.environ_map[envvar]
-            if os.environ.has_key(envvar):
+            if envvar in os.environ:
                 value = os.environ[envvar]
-                if handler is not None:
+                if handler != None:
                     try:
                         value = handler(value)
-                    except ValueError, msg:
+                    except ValueError as msg:
                         self.usage("invalid environment value for %s %r: %s"
                                    % (envvar, value, msg))
-                if name and value is not None:
+                if name and value != None:
                     self._set(name, value, 1)
 
-        if self.configfile is None:
+        if self.configfile == None:
             self.configfile = self.default_configfile(self.defaultssearchpaths)
 
         self.process_config()
@@ -318,20 +318,20 @@ class Options:
                 parts = confname.split(".")
                 obj = self.configroot
                 for part in parts:
-                    if obj is None:
+                    if obj == None:
                         break
                     # Here AttributeError is not a user error!
                     obj = getattr(obj, part)
                 self._set(name, obj, 0)
 
         # Process defaults
-        for name, value in self.default_map.items():
-            if getattr(self, name) is None:
+        for name, value in list(self.default_map.items()):
+            if getattr(self, name) == None:
                 setattr(self, name, value)
 
         # Process required options
-        for name, message in self.required_map.items():
-            if getattr(self, name) is None:
+        for name, message in list(self.required_map.items()):
+            if getattr(self, name) == None:
                 self.usage(message)
 
     def process_default_config_file(self, do_usage):
@@ -340,7 +340,7 @@ class Options:
             self.here = os.path.abspath(os.path.dirname(self.configfile))
         try:
             self.read_config(self.configfile)
-        except ValueError, msg:
+        except ValueError as msg:
             if do_usage:
                 # if this is not called from an RPC method, run usage and exit.
                 self.usage(str(msg))
@@ -356,7 +356,7 @@ class Options:
             self.here = os.path.abspath(os.path.dirname(configfile))
         try:
             self.read_custom_config(configfile)
-        except ValueError, msg:
+        except ValueError as msg:
             if do_usage:
                 # if this is not called from an RPC method, run usage and exit.
                 self.usage(str(msg))
@@ -377,7 +377,7 @@ class Options:
         parser.expansions = self.environ_expansions
         try:
             parser.readfp(configfile)
-        except ConfigParser.ParsingError, why:
+        except configparser.ParsingError as why:
             raise ValueError(str(why))
 
         host_node_name = platform.node()
@@ -390,7 +390,7 @@ class Options:
                 # Check for 'officially supported' configuration items
                 for param in ['serverurl', 'username', 'password']:
                     val = parser.saneget('rhadmin', param, None)
-                    if val is not None:
+                    if val != None:
                         setattr(self.configroot.rhadmin, param, val)
             elif sect == 'unix_http_server' and hasattr(self.configroot, 'adminserviced'):
                 server = None
@@ -400,13 +400,13 @@ class Options:
                         server = serverconfig
                         break
                 # This shouldn't happen, the defaults file probably didn't exist. I wouldn't expect to make it this far in that case
-                if server is None:
+                if server == None:
                     self.parse_warnings.append("'unix_http_server' configuration defined, but has no default configuration")
                     continue
                 # Check for 'officially supported' configuration items
                 for param in ['file', 'username', 'password']:
                     val = parser.saneget('unix_http_server', param, None)
-                    if val is not None:
+                    if val != None:
                         server[param] = val
 
     def exists(self, path):
@@ -424,7 +424,7 @@ class Options:
 
             name = section.split(':', 1)[1]
             factory_spec = parser.saneget(section, factory_key, None)
-            if factory_spec is None:
+            if factory_spec == None:
                 raise ValueError('section [%s] does not specify a %s'  %
                                  (section, factory_key))
             try:
@@ -544,22 +544,22 @@ class ServerOptions(Options):
         section = self.configroot.adminserviced
 
         # Additional checking of user option; set uid
-        if self.user is not None:
+        if self.user != None:
             try:
                 uid = name_to_uid(self.user)
-            except ValueError, msg:
+            except ValueError as msg:
                 self.usage(msg) # invalid user
             self.uid = uid
 
         # Additional checking of group option; set gid
-        if self.group is not None:
+        if self.group != None:
             try:
                 gid = name_to_gid(self.group)
-            except ValueError, msg:
+            except ValueError as msg:
                 self.usage(msg) # invalid group
             self.gid = gid
 
-        if self.uid is not None and self.gid is None:
+        if self.uid != None and self.gid == None:
             self.gid = gid_for_uid(uid)
 
         if not self.loglevel:
@@ -589,15 +589,15 @@ class ServerOptions(Options):
 
         # prefer a unix domain socket
         for config in [ config for config in sconfigs if
-                        config['family'] is socket.AF_UNIX ]:
+                        config['family'] == socket.AF_UNIX ]:
             path = config['file']
             self.serverurl = 'unix://%s' % path
             break
 
         # fall back to an inet socket
-        if self.serverurl is None:
+        if self.serverurl == None:
             for config in [ config for config in sconfigs if
-                            config['family'] is socket.AF_INET]:
+                            config['family'] == socket.AF_INET]:
                 host = config['host']
                 port = config['port']
                 if not host:
@@ -646,13 +646,13 @@ class ServerOptions(Options):
         
         groupMap = {}
         for group in self.process_group_configs:
-            if not groupMap.has_key(group.name):
+            if group.name not in groupMap:
                 groupMap[group.name] = group
             else:
                 existing = groupMap[group.name]
                 existing.process_configs.extend(group.process_configs)
                 existing.process_configs.sort()
-        self.process_group_configs = groupMap.values()
+        self.process_group_configs = list(groupMap.values())
         self.process_group_configs.sort()
 
     def parse_rh_config(self, fp, config_dir):
@@ -673,7 +673,7 @@ class ServerOptions(Options):
                 parser.read_file(fp)
             except AttributeError:
                 parser.readfp(fp)
-        except ConfigParser.ParsingError as why:
+        except configparser.ParsingError as why:
             raise ValueError(str(why))
         finally:
             if need_close:
@@ -687,7 +687,7 @@ class ServerOptions(Options):
                     'Included extra file "%s" during parsing' % filename)
                 try:
                     parser.read(filename)
-                except ConfigParser.ParsingError as why:
+                except configparser.ParsingError as why:
                     raise ValueError(str(why))
                 else:
                     parser.expand_here(
@@ -730,7 +730,7 @@ class ServerOptions(Options):
         parser.expansions = self.environ_expansions
         try:
             parser.readfp(fp)
-        except ConfigParser.ParsingError, why:
+        except configparser.ParsingError as why:
             raise ValueError(str(why))
 
         host_node_name = platform.node()
@@ -760,7 +760,7 @@ class ServerOptions(Options):
                         'Included extra file "%s" during parsing' % filename)
                     try:
                         parser.read(filename)
-                    except ConfigParser.ParsingError, why:
+                    except configparser.ParsingError as why:
                         raise ValueError(str(why))
 
         sections = parser.sections()
@@ -778,7 +778,7 @@ class ServerOptions(Options):
         section.minprocs = integer(get('minprocs', 200))
 
         directory = get('directory', None)
-        if directory is None:
+        if directory == None:
             section.directory = None
         else:
             section.directory = existing_directory(directory)
@@ -896,12 +896,12 @@ class ServerOptions(Options):
                 priority = processes[0].priority
                 enabled = processes[0].enable
                 domain_name = processes[0].DOMAIN_NAME
-                if groupMap.has_key(domain_name):
+                if domain_name in groupMap:
                     groupMap[domain_name].process_configs.extend(processes)
                 else:
                     groupMap[domain_name] = ProcessGroupConfig(self, domain_name, priority, enabled, processes)
 
-        for group in groupMap.values():
+        for group in list(groupMap.values()):
             groups.append(group)
 
         # process "event listener" homogeneous groups
@@ -939,7 +939,7 @@ class ServerOptions(Options):
             pool_events = []
             for pool_event_name in pool_event_names:
                 pool_event = getattr(EventTypes, pool_event_name, None)
-                if pool_event is None:
+                if pool_event == None:
                     raise ValueError('Unknown event type %s in [%s] events' %
                                      (pool_event_name, section))
                 pool_events.append(pool_event)
@@ -971,20 +971,20 @@ class ServerOptions(Options):
 
             # find proc_uid from "user" option
             proc_user = get(section, 'user', None)
-            if proc_user is None:
+            if proc_user == None:
                 proc_uid = None
             else:
                 proc_uid = name_to_uid(proc_user)
 
             # find proc_gid from "group" option
             proc_group = get(section, 'group', None)
-            if proc_group is None:
+            if proc_group == None:
                 proc_gid = None
             else:
                 proc_gid = name_to_gid(proc_group)
 
             socket_owner = get(section, 'socket_owner', None)
-            if socket_owner is not None:
+            if socket_owner != None:
                 try:
                     socket_owner = colon_separated_user_group(socket_owner)
                 except ValueError:
@@ -992,7 +992,7 @@ class ServerOptions(Options):
                                                                 % socket_owner)
 
             socket_mode = get(section, 'socket_mode', None)
-            if socket_mode is not None:
+            if socket_mode != None:
                 try:
                     socket_mode = octal_type(socket_mode)
                 except (TypeError, ValueError):
@@ -1007,7 +1007,7 @@ class ServerOptions(Options):
             try:
                 socket_config = self.parse_fcgi_socket(socket, proc_uid, proc_gid,
                                                     socket_owner, socket_mode)
-            except ValueError, e:
+            except ValueError as e:
                 raise ValueError('%s in [%s] socket' % (str(e), section))
 
             processes=self.processes_from_section(parser, section, program_name,
@@ -1029,21 +1029,21 @@ class ServerOptions(Options):
                                  path)
             path = normalize_path(path)
 
-            if socket_owner is None:
+            if socket_owner == None:
                 uid = os.getuid()
-                if proc_uid is not None and proc_uid != uid:
+                if proc_uid != None and proc_uid != uid:
                     gid = proc_gid
-                    if gid is None:
+                    if gid == None:
                         gid = gid_for_uid(proc_uid)
                     socket_owner = (proc_uid, gid)
 
-            if socket_mode is None:
+            if socket_mode == None:
                 socket_mode = int('700', 8)
 
             return UnixStreamSocketConfig(path, owner=socket_owner,
                                                 mode=socket_mode)
 
-        if socket_owner is not None or socket_mode is not None:
+        if socket_owner != None or socket_mode != None:
             raise ValueError("socket_owner and socket_mode params should"
                     + " only be used with a Unix domain socket")
 
@@ -1060,14 +1060,14 @@ class ServerOptions(Options):
         try:
             return self._processes_from_section(
                 parser, section, group_name, klass, defaults, default_klass)
-        except ValueError, e:
+        except ValueError as e:
             filename = parser.section_to_file.get(section, self.configfile)
             raise ValueError('%s in section %r (file: %r)'
                              % (e, section, filename))
 
     def _processes_from_section(self, parser, section, group_name,
                                 klass=None, defaults=False, default_klass=None):
-        if klass is None:
+        if klass == None:
             klass = ProcessConfig
 
         program_name = process_or_group_name(section.split(':', 1))
@@ -1082,79 +1082,79 @@ class ServerOptions(Options):
             kwargs['expansions'] = expansions
             return parser.saneget(section, opt, *args, **kwargs)
 
-        priority = integer(get(section, 'priority', '999' if default_klass is None else default_klass.priority))
-        autostart = boolean(get(section, 'autostart', 'true' if default_klass is None else str(default_klass.autostart)))
-        autorestart = auto_restart(get(section, 'autorestart', 'False' if default_klass is None else str(default_klass.autorestart)))
-        startsecs = integer(get(section, 'startsecs', 1 if default_klass is None else default_klass.startsecs))
-        startretries = integer(get(section, 'startretries', 3 if default_klass is None else default_klass.startretries))
-        stopsignal = signal_number(get(section, 'stopsignal', 'TERM' if default_klass is None else default_klass.stopsignal))
-        stopwaitsecs = integer(get(section, 'stopwaitsecs', 10 if default_klass is None else default_klass.stopwaitsecs))
-        stopasgroup = boolean(get(section, 'stopasgroup', 'false' if default_klass is None else str(default_klass.stopasgroup)))
-        killasgroup = boolean(get(section, 'killasgroup', str(stopasgroup) if default_klass is None else str(default_klass.killasgroup)))
-        exitcodes = list_of_exitcodes(get(section, 'exitcodes', '0,2' if default_klass is None else str(default_klass.exitcodes)))
-        run_detached = boolean(get(section, 'run_detached', 'false' if default_klass is None else str(default_klass.run_detached)))
+        priority = integer(get(section, 'priority', '999' if default_klass == None else default_klass.priority))
+        autostart = boolean(get(section, 'autostart', 'true' if default_klass == None else str(default_klass.autostart)))
+        autorestart = auto_restart(get(section, 'autorestart', 'False' if default_klass == None else str(default_klass.autorestart)))
+        startsecs = integer(get(section, 'startsecs', 1 if default_klass == None else default_klass.startsecs))
+        startretries = integer(get(section, 'startretries', 3 if default_klass == None else default_klass.startretries))
+        stopsignal = signal_number(get(section, 'stopsignal', 'TERM' if default_klass == None else default_klass.stopsignal))
+        stopwaitsecs = integer(get(section, 'stopwaitsecs', 10 if default_klass == None else default_klass.stopwaitsecs))
+        stopasgroup = boolean(get(section, 'stopasgroup', 'false' if default_klass == None else str(default_klass.stopasgroup)))
+        killasgroup = boolean(get(section, 'killasgroup', str(stopasgroup) if default_klass == None else str(default_klass.killasgroup)))
+        exitcodes = list_of_exitcodes(get(section, 'exitcodes', '0,2' if default_klass == None else str(default_klass.exitcodes)))
+        run_detached = boolean(get(section, 'run_detached', 'false' if default_klass == None else str(default_klass.run_detached)))
         pid_file = get(section, 'pid_file', None)
-        waitforprevious = integer(get(section, 'waitforprevious', 1 if default_klass is None else default_klass.waitforprevious))
-        failafterwait = boolean(get(section, 'failafterwait', 'false' if default_klass is None else str(default_klass.failafterwait)))
-        conditional_config = get(section, 'conditional_config', None if default_klass is None else default_klass.conditional_config)
+        waitforprevious = integer(get(section, 'waitforprevious', 1 if default_klass == None else default_klass.waitforprevious))
+        failafterwait = boolean(get(section, 'failafterwait', 'false' if default_klass == None else str(default_klass.failafterwait)))
+        conditional_config = get(section, 'conditional_config', None if default_klass == None else default_klass.conditional_config)
         # see also redirect_stderr check in process_groups_from_parser()
-        redirect_stderr = boolean(get(section, 'redirect_stderr', 'false' if default_klass is None else str(default_klass.redirect_stderr)))
+        redirect_stderr = boolean(get(section, 'redirect_stderr', 'false' if default_klass == None else str(default_klass.redirect_stderr)))
         environment_str = get(section, 'environment', '', do_expand=False)
         stdout_cmaxbytes = byte_size(get(section,'stdout_capture_maxbytes','0'))
         stdout_events = boolean(get(section, 'stdout_events_enabled','false'))
         stderr_cmaxbytes = byte_size(get(section,'stderr_capture_maxbytes','0'))
         stderr_events = boolean(get(section, 'stderr_events_enabled','false'))
-        start_pre_script = get(section, 'start_pre_script', None if default_klass is None else default_klass.start_pre_script)
-        start_post_script = get(section, 'start_post_script', None if default_klass is None else default_klass.start_post_script)
-        started_status_script = get(section, 'started_status_script', None if default_klass is None else default_klass.started_status_script)
-        status_script = get(section, 'status_script', None if default_klass is None else default_klass.status_script)
-        query_script = get(section, 'query_script', None if default_klass is None else default_klass.query_script)
-        stop_pre_script = get(section, 'stop_pre_script', None if default_klass is None else default_klass.stop_pre_script)
-        stop_post_script = get(section, 'stop_post_script', None if default_klass is None else default_klass.stop_post_script)
-        start_cmd_option = get(section, 'start_cmd_option', None if default_klass is None else default_klass.start_cmd_option)
-        status_cmd_option = get(section, 'status_cmd_option', None if default_klass is None else default_klass.status_cmd_option)
-        stop_cmd_option = get(section, 'stop_cmd_option', None if default_klass is None else default_klass.stop_cmd_option)
-        ulimit = get(section, 'ulimit', None if default_klass is None else default_klass.ulimit)
-        nicelevel = get(section, 'nicelevel', None if default_klass is None else default_klass.nicelevel)
-        affinity = get(section, 'affinity', None if default_klass is None else default_klass.affinity)
-        corefiles = get(section, 'corefiles', None if default_klass is None else default_klass.corefiles)
-        serverurl = get(section, 'serverurl', None if default_klass is None else default_klass.serverurl)
+        start_pre_script = get(section, 'start_pre_script', None if default_klass == None else default_klass.start_pre_script)
+        start_post_script = get(section, 'start_post_script', None if default_klass == None else default_klass.start_post_script)
+        started_status_script = get(section, 'started_status_script', None if default_klass == None else default_klass.started_status_script)
+        status_script = get(section, 'status_script', None if default_klass == None else default_klass.status_script)
+        query_script = get(section, 'query_script', None if default_klass == None else default_klass.query_script)
+        stop_pre_script = get(section, 'stop_pre_script', None if default_klass == None else default_klass.stop_pre_script)
+        stop_post_script = get(section, 'stop_post_script', None if default_klass == None else default_klass.stop_post_script)
+        start_cmd_option = get(section, 'start_cmd_option', None if default_klass == None else default_klass.start_cmd_option)
+        status_cmd_option = get(section, 'status_cmd_option', None if default_klass == None else default_klass.status_cmd_option)
+        stop_cmd_option = get(section, 'stop_cmd_option', None if default_klass == None else default_klass.stop_cmd_option)
+        ulimit = get(section, 'ulimit', None if default_klass == None else default_klass.ulimit)
+        nicelevel = get(section, 'nicelevel', None if default_klass == None else default_klass.nicelevel)
+        affinity = get(section, 'affinity', None if default_klass == None else default_klass.affinity)
+        corefiles = get(section, 'corefiles', None if default_klass == None else default_klass.corefiles)
+        serverurl = get(section, 'serverurl', None if default_klass == None else default_klass.serverurl)
         if serverurl and serverurl.strip().upper() == 'AUTO':
             serverurl = None
 
         logfile_directory = get(section, 'logfile_directory', None)
         # If this isn't a REDHAWK config, default to the adminservice childlogdir setting
-        if logfile_directory is None and not defaults and default_klass is None:
+        if logfile_directory == None and not defaults and default_klass == None:
             logfile_directory = self.configroot.adminserviced.childlogdir
         # If this is a REDHAWK config and it's not the default, use the default
-        elif default_klass is not None:
+        elif default_klass != None:
             logfile_directory = default_klass.logfile_directory
 
         # Determine the enable flag - try convert it to a boolean
-        enablement = self.getEnableValue(section, get, 'True' if default_klass is None else str(default_klass.enable))
+        enablement = self.getEnableValue(section, get, 'True' if default_klass == None else str(default_klass.enable))
 
         # find uid from "user" option
         user = get(section, 'user', None)
-        if user is None:
-            uid = None if default_klass is None else default_klass.uid
+        if user == None:
+            uid = None if default_klass == None else default_klass.uid
         else:
             parser.remove_option(section, 'user')
             uid = name_to_uid(user)
 
         # find uid from "group" option
         group = get(section, 'group', None)
-        if group is None:
-            if default_klass is None:
-                gid = gid_for_uid(uid) if uid is not None else None
+        if group == None:
+            if default_klass == None:
+                gid = gid_for_uid(uid) if uid != None else None
             else:
-                gid = default_klass.gid if default_klass.gid is not None else gid_for_uid(uid) if uid is not None else None
+                gid = default_klass.gid if default_klass.gid != None else gid_for_uid(uid) if uid != None else None
         else:
             parser.remove_option(section, 'group')
             gid = name_to_gid(group)
 
         umask = get(section, 'umask', None)
-        if umask is None:
-            umask = None if default_klass is None else default_klass.umask
+        if umask == None:
+            umask = None if default_klass == None else default_klass.umask
         else:
             umask = octal_type(umask)
 
@@ -1172,17 +1172,17 @@ class ServerOptions(Options):
         environment = dict_of_key_value_pairs(
             expand(environment_str, expansions, 'environment'))
         # Update the expansions with what we just read so we can use them later
-        for key, value in environment.iteritems():
+        for key, value in environment.items():
             expansions["ENV_%s" % key] = value
 
-        directory = get(section, 'directory', None if default_klass is None else default_klass.directory)
+        directory = get(section, 'directory', None if default_klass == None else default_klass.directory)
 
         logfiles = {}
 
         for k in ('stdout', 'stderr'):
             n = '%s_logfile' % k
             lf_val = get(section, n, Automatic)
-            if isinstance(lf_val, basestring):
+            if isinstance(lf_val, str):
                 lf_val = expand(lf_val, expansions, n)
             lf_val = logfile_name(lf_val)
             logfiles[n] = lf_val
@@ -1195,7 +1195,7 @@ class ServerOptions(Options):
             maxbytes = byte_size(get(section, mb_key, '50MB'))
             logfiles[mb_key] = maxbytes
 
-            if lf_val is Automatic and not maxbytes:
+            if lf_val == Automatic and not maxbytes:
                 self.parse_warnings.append(
                     'For [%s], AUTO logging used for %s without '
                     'rollover, set maxbytes > 0 to avoid filling up '
@@ -1211,7 +1211,7 @@ class ServerOptions(Options):
             logfiles['stderr_logfile'] = None
 
         command = get(section, 'command', None, expansions=expansions)
-        if command is None and not defaults and (default_klass is not None and not hasattr(default_klass, 'command')):
+        if command == None and not defaults and (default_klass != None and not hasattr(default_klass, 'command')):
             raise ValueError(
                 'program section %s does not specify a command' % section)
 
@@ -1270,19 +1270,19 @@ class ServerOptions(Options):
             corefiles=corefiles)
         
         def filter_comment(val):
-            if val is not None and val.find(';') == 0:
+            if val != None and val.find(';') == 0:
                 return None
             return val
 
-        if defaults or default_klass is not None:
-            if default_klass is not None:
+        if defaults or default_klass != None:
+            if default_klass != None:
                 default_klass.copyInto(pconfig)
             
             args = {}
             for key in klass.add_req_param_names:
                 try:
                     val = filter_comment(get(section, key, expansions=expansions))
-                    if val is not None and len(val) > 0:
+                    if val != None and len(val) > 0:
                         args[key] = val
                 except:
                     pass
@@ -1290,7 +1290,7 @@ class ServerOptions(Options):
             for key in klass.optional_param_names:
                 try:
                     val = filter_comment(get(section, key, expansions=expansions))
-                    if val is not None and len(val) > 0:
+                    if val != None and len(val) > 0:
                         args[key] = val
                 except:
                     pass
@@ -1303,12 +1303,12 @@ class ServerOptions(Options):
         knownKeys |= set([k.lower() for k in pconfig.req_param_names])
         if hasattr(pconfig, 'add_req_param_names'):
             knownKeys |= set([k.lower() for k in pconfig.add_req_param_names])
-        remaining = filter(lambda x: x not in knownKeys, allKeys)
+        remaining = [x for x in allKeys if x not in knownKeys]
 
         for key in remaining:
             try:
                 val = filter_comment(get(section, key, expansions=expansions))
-                if val is not None and len(val) > 0:
+                if val != None and len(val) > 0:
                     setattr(pconfig, key, val)
             except:
                 pass
@@ -1317,7 +1317,7 @@ class ServerOptions(Options):
 
     def getEnableValue(self, section, get, defaultValue):
         enablement = get(section, 'enable', None)
-        if enablement is None:
+        if enablement == None:
             enablement = defaultValue
         try:
             enabled = boolean(enablement)
@@ -1353,8 +1353,8 @@ class ServerOptions(Options):
         get = parser.saneget
         username = get(section, 'username', None)
         password = get(section, 'password', None)
-        if username is not None or password is not None:
-            if username is None or password is None:
+        if username != None or password != None:
+            if username == None or password == None:
                 raise ValueError(
                     'Section [%s] contains incomplete authentication: '
                     'If a username or a password is specified, both the '
@@ -1371,7 +1371,7 @@ class ServerOptions(Options):
             config['name'] = name
             config['family'] = socket.AF_INET
             port = get(section, 'port', None)
-            if port is None:
+            if port == None:
                 raise ValueError('section [%s] has no port value' % section)
             host, port = inet_address(port)
             config['host'] = host
@@ -1384,7 +1384,7 @@ class ServerOptions(Options):
             config = {}
             get = parser.saneget
             sfile = get(section, 'file', None, expansions={'here': self.here})
-            if sfile is None:
+            if sfile == None:
                 raise ValueError('section [%s] has no file value' % section)
             sfile = sfile.strip()
             config['name'] = name
@@ -1392,7 +1392,7 @@ class ServerOptions(Options):
             config['file'] = normalize_path(sfile)
             config.update(self._parse_username_and_password(parser, section))
             chown = get(section, 'chown', None)
-            if chown is not None:
+            if chown != None:
                 try:
                     chown = colon_separated_user_group(chown)
                 except ValueError:
@@ -1401,7 +1401,7 @@ class ServerOptions(Options):
                 chown = (-1, -1)
             config['chown'] = chown
             chmod = get(section, 'chmod', None)
-            if chmod is not None:
+            if chmod != None:
                 try:
                     chmod = octal_type(chmod)
                 except (TypeError, ValueError):
@@ -1451,7 +1451,7 @@ class ServerOptions(Options):
         if self.directory:
             try:
                 os.chdir(self.directory)
-            except OSError, err:
+            except OSError as err:
                 self.logger.critical("can't chdir into %r: %s"
                                      % (self.directory, err))
             else:
@@ -1504,9 +1504,9 @@ class ServerOptions(Options):
         for config, server in self.httpservers:
             server.close()
             # server._map is a reference to the asyncore socket_map
-            for dispatcher in self.get_socket_map().values():
+            for dispatcher in list(self.get_socket_map().values()):
                 dispatcher_server = getattr(dispatcher, 'server', None)
-                if dispatcher_server is server:
+                if dispatcher_server == server:
                     dispatcher_servers.append(dispatcher)
         for server in dispatcher_servers:
             # TODO: try to remove this entirely.
@@ -1541,7 +1541,7 @@ class ServerOptions(Options):
         try:
             self.httpservers = self.make_http_servers(adminserviced)
             self.unlink_socketfiles = True
-        except socket.error, why:
+        except socket.error as why:
             if why.args[0] == errno.EADDRINUSE:
                 self.usage('Another program is already listening on '
                            'a port that one of our HTTP servers is '
@@ -1550,12 +1550,12 @@ class ServerOptions(Options):
             else:
                 help = 'Cannot open an HTTP server: socket.error reported'
                 errorname = errno.errorcode.get(why.args[0])
-                if errorname is None:
+                if errorname == None:
                     self.usage('%s %s' % (help, why.args[0]))
                 else:
                     self.usage('%s errno.%s (%d)' %
                                (help, errorname, why.args[0]))
-        except ValueError, why:
+        except ValueError as why:
             self.usage(why.args[0])
 
     def get_autochildlog_name(self, name, identifier, channel):
@@ -1611,7 +1611,7 @@ class ServerOptions(Options):
         # left zombies laying around.
         try:
             pid, sts = os.waitpid(-1, os.WNOHANG)
-        except OSError, exc:
+        except OSError as exc:
             code = exc.args[0]
             if code not in (errno.ECHILD, errno.EINTR):
                 self.logger.critical(
@@ -1628,7 +1628,7 @@ class ServerOptions(Options):
         username or uid.  Called for adminserviced startup and when spawning
         subprocesses.  Returns None on success or a string error message if
         privileges could not be dropped."""
-        if user is None:
+        if user == None:
             return "No user specified to setuid to!"
 
         # get uid for user, which can be a number or username
@@ -1658,7 +1658,7 @@ class ServerOptions(Options):
         if current_uid != 0:
             return "Can't drop privilege as nonroot user"
 
-        if group is not None:
+        if group != None:
             try:
                 gid = int(group)
             except ValueError:
@@ -1673,9 +1673,7 @@ class ServerOptions(Options):
 
             # always put our primary gid first in this list, otherwise we can
             # lose group info since sometimes the first group in the setgroups
-            # list gets overwritten on the subsequent setgid call (at least on
-            # freebsd 9 with python 2.7 - this will be safe though for all unix
-            # /python version combos)
+            # list gets overwritten on the subsequent setgid call
             groups.insert(0, gid)
             try:
                 os.setgroups(groups)
@@ -1691,7 +1689,7 @@ class ServerOptions(Options):
         """Set the uid of the adminserviced process.  Called during adminserviced
         startup only.  No return value.  Exits the process via usage() if
         privileges could not be dropped."""
-        if self.uid is None:
+        if self.uid == None:
             if os.getuid() == 0:
                 self.parse_criticals.append('AdminService is running as root.  '
                         'Privileges were not dropped because no user is '
@@ -1700,7 +1698,7 @@ class ServerOptions(Options):
                         'to avoid this message.')
         else:
             msg = self.drop_privileges(self.uid, self.gid)
-            if msg is None:
+            if msg == None:
                 self.parse_infos.append('Set uid to user %s, gid to %s succeeded' %
                                         (self.uid, self.gid))
             else:  # failed to drop privileges
@@ -1792,9 +1790,9 @@ class ServerOptions(Options):
     def close_fd(self, fd):
         try:
             os.close(fd)
-        except IOError, e:
+        except IOError as e:
             pass
-        except OSError, e:
+        except OSError as e:
             pass
 
     def fork(self):
@@ -1840,7 +1838,7 @@ class ServerOptions(Options):
     def get_path(self):
         """Return a list corresponding to $PATH, or a default."""
         path = ["/bin", "/usr/bin", "/usr/local/bin"]
-        if os.environ.has_key("PATH"):
+        if "PATH" in os.environ:
             p = os.environ["PATH"]
             if p:
                 path = p.split(os.pathsep)
@@ -1850,7 +1848,7 @@ class ServerOptions(Options):
         return os.getpid()
 
     def check_execv_args(self, filename, argv, st):
-        if st is None:
+        if st == None:
             raise NotFound("can't find command %r" % filename)
 
         elif stat.S_ISDIR(st[stat.ST_MODE]):
@@ -1871,7 +1869,7 @@ class ServerOptions(Options):
     def readfd(self, fd):
         try:
             data = os.read(fd, 2 << 16) # 128K
-        except OSError, why:
+        except OSError as why:
             if why.args[0] not in (errno.EWOULDBLOCK, errno.EBADF, errno.EINTR):
                 raise
             data = ''
@@ -1904,28 +1902,28 @@ class ServerOptions(Options):
                 stderr, child_stderr = os.pipe()
                 pipes['stderr'], pipes['child_stderr'] = stderr, child_stderr
             for fd in (pipes['stdout'], pipes['stderr'], pipes['stdin']):
-                if fd is not None:
+                if fd != None:
                     flags = fcntl.fcntl(fd, fcntl.F_GETFL) | os.O_NDELAY
                     fcntl.fcntl(fd, fcntl.F_SETFL, flags)
             return pipes
         #TODO - this is commented out... remove?
         #except (OSError,IOError):
         except OSError:
-            for fd in pipes.values():
-                if fd is not None:
+            for fd in list(pipes.values()):
+                if fd != None:
                     self.close_fd(fd)
             raise
 
     def close_parent_pipes(self, pipes):
         for fdname in ('stdin', 'stdout', 'stderr'):
             fd = pipes.get(fdname)
-            if fd is not None:
+            if fd != None:
                 self.close_fd(fd)
 
     def close_child_pipes(self, pipes):
         for fdname in ('child_stdin', 'child_stdout', 'child_stderr'):
             fd = pipes.get(fdname)
-            if fd is not None:
+            if fd != None:
                 self.close_fd(fd)
 
 class ClientOptions(Options):
@@ -2019,7 +2017,7 @@ class ClientOptions(Options):
 
     def getServerProxy(self):
         # mostly put here for unit testing
-        return xmlrpclib.ServerProxy(
+        return xmlrpc_client.ServerProxy(
             # ServerProxy won't allow us to pass in a non-HTTP url,
             # so we fake the url we pass into it and always use the transport's
             # 'serverurl' to figure out what to attach to
@@ -2031,16 +2029,16 @@ class ClientOptions(Options):
 
 _marker = []
 
-class UnhosedConfigParser(ConfigParser.RawConfigParser):
+class UnhosedConfigParser(configparser.RawConfigParser):
     mysection = 'adminserviced'
 
     def __init__(self, *args, **kwargs):
-        ConfigParser.RawConfigParser.__init__(self, *args, **kwargs)
+        configparser.RawConfigParser.__init__(self, *args, **kwargs)
         self.section_to_file = {}
         self.expansions = {}
 
     def read_string(self, s):
-        from StringIO import StringIO
+        from io import StringIO
         s = StringIO(s)
         return self.readfp(s)
 
@@ -2050,7 +2048,7 @@ class UnhosedConfigParser(ConfigParser.RawConfigParser):
         RawConfigParser that is overridden to build self.section_to_file,
         which is a mapping of section names to the files they came from.
         '''
-        if isinstance(filenames, basestring):  # RawConfigParser compat
+        if isinstance(filenames, str):  # RawConfigParser compat
             filenames = [filenames]
 
         ok_filenames = []
@@ -2058,7 +2056,7 @@ class UnhosedConfigParser(ConfigParser.RawConfigParser):
             sections_orig = self._sections.copy()
 
             ok_filenames.extend(
-                ConfigParser.RawConfigParser.read(self, [filename], **kwargs))
+                configparser.RawConfigParser.read(self, [filename], **kwargs))
 
             diff = frozenset(self._sections) - frozenset(sections_orig)
             for section in diff:
@@ -2068,21 +2066,21 @@ class UnhosedConfigParser(ConfigParser.RawConfigParser):
     def saneget(self, section, option, default=_marker, do_expand=True,
                 expansions={}):
         try:
-            optval = self.get(section, option)
-            if optval is not None and optval.startswith(';'):
+            optval = self.get(section, option).split(';')[0].replace(' ','').replace("\t","")
+            if optval != None and optval.startswith(';'):
                 optval = default
-        except ConfigParser.NoOptionError:
-            if default is _marker:
+        except configparser.NoOptionError:
+            if default == _marker:
                 raise
             else:
                 optval = default
          
-        if do_expand and isinstance(optval, basestring):
+        if do_expand and isinstance(optval, str):
             combined_expansions = dict(
                 list(self.expansions.items()) + list(expansions.items()))
 
             optval = expand(optval, combined_expansions,
-                           "%s.%s" % (section, option))
+                           "%s.%s" % (section, option)).replace(' ','').replace("\t","")
 
         return optval
 
@@ -2095,7 +2093,7 @@ class UnhosedConfigParser(ConfigParser.RawConfigParser):
         for section in self.sections():
             for key, value in self.items(section):
                 if HERE_FORMAT in value:
-                    assert here is not None, "here has not been set to a path"
+                    assert here != None, "here has not been set to a path"
                     value = value.replace(HERE_FORMAT, here)
                     self.set(section, key, value)
 
@@ -2160,7 +2158,7 @@ class ProcessConfig(Config):
         self.options = options
         self.alive = False
         self.waits_left = None
-        if params is not None:
+        if params != None:
             for name in self.req_param_names:
                 if not defaults:
                     setattr(self, name, params[name])
@@ -2186,11 +2184,11 @@ class ProcessConfig(Config):
         get_autoname = self.options.get_autochildlog_name
         sid = self.options.identifier
         name = self.name
-        if self.stdout_logfile is Automatic:
+        if self.stdout_logfile == Automatic:
             self.stdout_logfile = get_autoname(name, sid, 'stdout')
-        if self.stderr_logfile is Automatic:
+        if self.stderr_logfile == Automatic:
             self.stderr_logfile = get_autoname(name, sid, 'stderr')
-        if self.run_detached and self.pid_file is None:
+        if self.run_detached and self.pid_file == None:
             self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, "%s.%s.pid" % (self.name, self.sid)))
 
         redirect = ''
@@ -2218,29 +2216,29 @@ class ProcessConfig(Config):
         from adminservice.dispatchers import POutputDispatcher
         from adminservice.dispatchers import PInputDispatcher
         from adminservice import events
-        if stdout_fd is not None:
+        if stdout_fd != None:
             etype = events.ProcessCommunicationStdoutEvent
             dispatchers[stdout_fd] = POutputDispatcher(proc, etype, stdout_fd)
-        if stderr_fd is not None:
+        if stderr_fd != None:
             etype = events.ProcessCommunicationStderrEvent
             dispatchers[stderr_fd] = POutputDispatcher(proc, etype, stderr_fd)
-        if stdin_fd is not None:
+        if stdin_fd != None:
             dispatchers[stdin_fd] = PInputDispatcher(proc, 'stdin', stdin_fd)
         return dispatchers, p
 
     def is_enabled(self):
-        if self.enable is True or self.enable is False:
+        if self.enable == True or self.enable == False:
             return self.enable
-        if self.conditional_config is not None:
+        if self.conditional_config != None:
             # read in the config file
             enablement = readFile(self.conditional_config, 0, 0)
             # We read in the entire file with \n's, re.MULTILINE allows ^$ to match the \n line instead of the whole string
             groups = re.search(self.enable, enablement, re.MULTILINE)
-            return groups is not None
+            return groups != None
 
     def get_pid(self):
         pid = -1
-        if self.pid_file is not None and os.path.exists(self.pid_file):
+        if self.pid_file != None and os.path.exists(self.pid_file):
             pid = readFile(self.pid_file, 0, 0).strip()
             try:
                 pid = integer(pid)
@@ -2252,16 +2250,16 @@ class ProcessConfig(Config):
         cmd = self.command
         if self.run_detached:
             pre_script = ''
-            if self.start_pre_script is not None:
+            if self.start_pre_script != None:
                 script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_pre_script) else '.', self.start_pre_script)
                 pre_script = ("%s %s;" % (script, self.output_redirect))
 
             post_script = ''
-            if self.start_post_script is not None:
+            if self.start_post_script != None:
                 script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_post_script) else '.', self.start_post_script)
                 post_script = ("; %s %s" % (script, self.output_redirect))
             
-            pid = (" echo $! > %s" % self.pid_file) if self.pid_file is not None else ''
+            pid = (" echo $! > %s" % self.pid_file) if self.pid_file != None else ''
             
             cmd = "/bin/bash -c '%s %s %s & %s %s'" % (pre_script, cmd, self.output_redirect, pid, post_script)
         return cmd
@@ -2270,20 +2268,20 @@ class ProcessConfig(Config):
         return None
 
     def is_started(self):
-        if self.started_status_script is not None:
-            cmd = "%s %s" % (self.started_status_script, '' if self.pid_file is None else self.pid_file)
+        if self.started_status_script != None:
+            cmd = "%s %s" % (self.started_status_script, '' if self.pid_file == None else self.pid_file)
             return os.system(cmd) == 0
         else:
             return self.check_status()
 
     def check_status(self):
-        if self.status_script is not None:
-            cmd = "%s %s" % (self.status_script, '' if self.pid_file is None else self.pid_file)
+        if self.status_script != None:
+            cmd = "%s %s" % (self.status_script, '' if self.pid_file == None else self.pid_file)
             return os.system(cmd) == 0
 
         try:
             pid = self.get_pid()
-            if pid is None or pid == -1:
+            if pid == None or pid == -1:
                 self.alive = False
                 return False
             else:
@@ -2335,19 +2333,19 @@ class RedhawkProcessConfig(ProcessConfig):
         # If we override these and put strings in there, we'll blow up the assumed
         # typing that was done before when making the ProcessConfig
         for name in self.req_param_names:
-            if getattr(copyInto, name) is None:
+            if getattr(copyInto, name) == None:
                 val = getattr(self, name, None)
-                if val is not None:
+                if val != None:
                     setattr(copyInto, name, val)
         for name in self.optional_param_names:
-            if getattr(copyInto, name) is None:
+            if getattr(copyInto, name) == None:
                 val = getattr(self, name, None)
-                if val is not None:
+                if val != None:
                     setattr(copyInto, name, val)
         # These aren't already processed previously
         for name in self.add_req_param_names:
             val = getattr(self, name, None)
-            if val is not None and getattr(copyInto, name, None) is None:
+            if val != None and getattr(copyInto, name, None) == None:
                 setattr(copyInto, name, val)
         
     def setValues(self, config_name, defaults, params):
@@ -2356,8 +2354,8 @@ class RedhawkProcessConfig(ProcessConfig):
         for name in self.req_param_names:
             if name in params:
                 val = params.get(name, None)
-                if val is None:
-                    if getattr(self, name) is None:
+                if val == None:
+                    if getattr(self, name) == None:
                         raise ValueError("Missing value for required parameter %s" % name)
                     else:
                         val = getattr(self, name, None)
@@ -2366,8 +2364,8 @@ class RedhawkProcessConfig(ProcessConfig):
         for name in self.add_req_param_names:
             if not defaults:
                 val = params.get(name, None)
-                if val is None:
-                    if getattr(self, name, None) is None:
+                if val == None:
+                    if getattr(self, name, None) == None:
                         raise ValueError("Missing value for required parameter %s" % name)
                     else:
                         val = getattr(self, name, None)
@@ -2379,44 +2377,44 @@ class RedhawkProcessConfig(ProcessConfig):
             if name == 'environment':
                 continue
             val = params.get(name, None)
-            if val is None and hasattr(self, name):
+            if val == None and hasattr(self, name):
                 val = getattr(self, name, None)
 
             setattr(self, name, val)
-        if hasattr(self, 'DEBUG_LEVEL') and self.DEBUG_LEVEL is not None:
+        if hasattr(self, 'DEBUG_LEVEL') and self.DEBUG_LEVEL != None:
             self.DEBUG_LEVEL = debug_level(self.DEBUG_LEVEL)
 
-        if hasattr(self, 'waitforprevious') and self.waitforprevious is not None:
+        if hasattr(self, 'waitforprevious') and self.waitforprevious != None:
             self.waitforprevious = integer(self.waitforprevious)
 
         for name in self.env_param_names:
             val = getattr(self, name, None)
-            if val is not None:
+            if val != None:
                 self.environment[name] = val
 
     def make_command(self):
         comm = os.path.join(self.SDRROOT, self.command)
         for name in self.add_req_param_names:
-            if name is not 'command' and hasattr(self, name):
+            if name != 'command' and hasattr(self, name):
                 comm = "%s %s %s" % (comm, name, getattr(self, name))
         for name in self.command_line_flags:
             if hasattr(self, name):
                 val = getattr(self, name)
-                if val is not None and boolean(val):
+                if val != None and boolean(val):
                     comm = "%s %s" % (comm, name)
 
         for name in self.optional_command_line_param_names:
             if hasattr(self, name):
                 val = getattr(self, name)
-                if val is not None:
-                    if self.convert_param_names.has_key(name):
+                if val != None:
+                    if name in self.convert_param_names:
                         name = self.convert_param_names[name]
                     comm = "%s %s %s" % (comm, name, val)
 
         return comm
     
     def create_autochildlogs(self):
-        logdir = self.logfile_directory if self.logfile_directory is not None else self.options.childlogdir
+        logdir = self.logfile_directory if self.logfile_directory != None else self.options.childlogdir
         if self.redirect_stderr:
             self.logfile = existing_dirpath(os.path.join(logdir, "%s.%s.log" % (self.DOMAIN_NAME, self.name)))
             self.stderr_logfile = None
@@ -2440,31 +2438,31 @@ class RedhawkProcessConfig(ProcessConfig):
         cmd = self.command
 
         if self.run_detached:
-            cgroup = ("cgexec " + self.cgroup) if self.cgroup is not None else ''
+            cgroup = ("cgexec " + self.cgroup) if self.cgroup != None else ''
 
-            nice = ("/bin/nice " + self.nicelevel) if self.nicelevel is not None else ''
+            nice = ("/bin/nice " + self.nicelevel) if self.nicelevel != None else ''
 
             ulimit = ''
-            if self.ulimit is not None:
-                ulimit = "ulimit %s %s >/dev/null 2>&1;" % (self.ulimit, ('-c ' + self.corefiles) if self.corefiles is not None else '')
-            elif self.corefiles is not None:
+            if self.ulimit != None:
+                ulimit = "ulimit %s %s >/dev/null 2>&1;" % (self.ulimit, ('-c ' + self.corefiles) if self.corefiles != None else '')
+            elif self.corefiles != None:
                 ulimit = "ulimit -c %s >/dev/null 2>&1;" % self.corefiles
 
-            numactl = ("numactl " + self.affinity) if self.affinity is not None else ''
+            numactl = ("numactl " + self.affinity) if self.affinity != None else ''
 
-            start_cmd_option = self.start_cmd_option if self.start_cmd_option is not None else ''
+            start_cmd_option = self.start_cmd_option if self.start_cmd_option != None else ''
 
             pre_script = ''
-            if self.start_pre_script is not None:
+            if self.start_pre_script != None:
                 script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_pre_script) else '.', self.start_pre_script)
                 pre_script = ("%s %s;" % (script, self.output_redirect))
 
             post_script = ''
-            if self.start_post_script is not None:
+            if self.start_post_script != None:
                 script = "%s %s" % ('/usr/bin/run-parts' if os.path.isdir(self.start_post_script) else '.', self.start_post_script)
                 post_script = ("; %s %s" % (script, self.output_redirect))
             
-            pid = " echo $! > %s" % self.pid_file if addPid and self.pid_file is not None else ''
+            pid = " echo $! > %s" % self.pid_file if addPid and self.pid_file != None else ''
             
             cmd = "%s %s /bin/bash -c '%s %s %s %s %s %s & %s %s'" % (cgroup, nice, ulimit, pre_script, numactl, cmd, start_cmd_option, self.output_redirect, pid, post_script)
 
@@ -2498,21 +2496,21 @@ class DomainConfig(RedhawkProcessConfig):
         RedhawkProcessConfig.setValues(self, config_name, defaults, params)
 
         if not defaults:
-            if getattr(self, 'SDRROOT', None) is None:
+            if getattr(self, 'SDRROOT', None) == None:
                 self.SDRROOT = self.options.environ_expansions['ENV_SDRROOT']
-            if getattr(self, 'PERSISTENCE', None) is not None:
+            if getattr(self, 'PERSISTENCE', None) != None:
                 self.PERSISTENCE = boolean(self.PERSISTENCE)
-            if getattr(self, 'FORCE_REBIND', None) is not None:
+            if getattr(self, 'FORCE_REBIND', None) != None:
                 self.FORCE_REBIND = boolean(self.FORCE_REBIND)
             
-            if self.DOMAIN_NAME is None or self.DOMAIN_NAME.find(' ') > -1:
+            if self.DOMAIN_NAME == None or self.DOMAIN_NAME.find(' ') > -1:
                 raise ValueError("Invalid value for %s: '%s'" % ('DOMAIN_NAME', self.DOMAIN_NAME))
             
             self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, 'domain-mgrs', "%s.pid" % self.DOMAIN_NAME))
             self.command = self.make_command()
 
     def create_autochildlogs(self):
-        self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'domain-mgrs'))
+        self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory != None else os.path.join(self.options.childlogdir, 'domain-mgrs'))
         RedhawkProcessConfig.create_autochildlogs(self)
 
 class NodeConfig(RedhawkProcessConfig):
@@ -2544,21 +2542,21 @@ class NodeConfig(RedhawkProcessConfig):
     def setValues(self, config_name, defaults, params):
         RedhawkProcessConfig.setValues(self, config_name, defaults, params)
         if not defaults:
-            if getattr(self, 'SDRROOT', None) is None:
+            if getattr(self, 'SDRROOT', None) == None:
                 self.SDRROOT = self.options.environ_expansions['ENV_SDRROOT']
-            if getattr(self, 'OSSIEHOME', None) is None:
+            if getattr(self, 'OSSIEHOME', None) == None:
                 self.OSSIEHOME = self.options.environ_expansions['ENV_OSSIEHOME']
             
-            if (self.NODE_NAME is None or self.NODE_NAME.find(' ') > -1) and self.DCD_FILE is None:
+            if (self.NODE_NAME == None or self.NODE_NAME.find(' ') > -1) and self.DCD_FILE == None:
                 raise ValueError("Cannot figure out what the DCD file should be")
-            elif self.DCD_FILE is None:
+            elif self.DCD_FILE == None:
                 self.DCD_FILE = "/nodes/%s/DeviceManager.dcd.xml" % self.NODE_NAME
 
             self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, 'device-mgrs', "%s.%s.pid" % (self.DOMAIN_NAME, self.name)))
             self.command = self.make_command()
 
     def create_autochildlogs(self):
-        self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'device-mgrs'))
+        self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory != None else os.path.join(self.options.childlogdir, 'device-mgrs'))
         RedhawkProcessConfig.create_autochildlogs(self)
 
 class WaveformConfig(RedhawkProcessConfig):
@@ -2583,22 +2581,22 @@ class WaveformConfig(RedhawkProcessConfig):
     def setValues(self, config_name, defaults, params):
         RedhawkProcessConfig.setValues(self, config_name, defaults, params)
         if not defaults:
-            if self.DOMAIN_NAME is None or self.DOMAIN_NAME.find(' ') > -1:
+            if self.DOMAIN_NAME == None or self.DOMAIN_NAME.find(' ') > -1:
                 raise ValueError("Invalid value for %s: '%s'" % ('DOMAIN_NAME', self.DOMAIN_NAME))
 
             wave_name = self.WAVEFORM
-            if self.INSTANCE_NAME is not None:
+            if self.INSTANCE_NAME != None:
                 wave_name += "." + self.INSTANCE_NAME
-            self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory is not None else os.path.join(self.options.childlogdir, 'waveforms'))
+            self.logfile_directory = existing_dirpath(self.logfile_directory if self.logfile_directory != None else os.path.join(self.options.childlogdir, 'waveforms'))
             self.pid_file = existing_dirpath(os.path.join(self.options.childpiddir, 'waveforms', "%s.%s.pid" % (self.DOMAIN_NAME, wave_name)))
 
             self.command = self.command + " -d " + self.DOMAIN_NAME
             self.command = self.command + " -w " + self.WAVEFORM
             self.command = self.command + " -i " + self.pid_file
 
-            if self.INSTANCE_NAME is not None:
+            if self.INSTANCE_NAME != None:
                 self.command = self.command + " -n " + self.INSTANCE_NAME
-            if self.start_delay is not None:
+            if self.start_delay != None:
                 self.command = self.command + " --delay=" + self.start_delay
 
     def get_start_command(self, addPid=True):
@@ -2609,11 +2607,11 @@ class WaveformConfig(RedhawkProcessConfig):
         return "%s %s" % (remove_command, self.stop_cmd_option)
 
     def check_status(self):
-        if self.status_script is not None:
+        if self.status_script != None:
             cmd = "%s %s" % (self.status_script, self.pid_file)
             return os.system(cmd) == 0
 
-        if self.pid_file is not None and os.path.exists(self.pid_file):
+        if self.pid_file != None and os.path.exists(self.pid_file):
             status_command = readFile(self.pid_file, 0, 0).strip()
             return os.system("%s --quiet %s" % (status_command, self.status_cmd_option)) == 0
         return False
@@ -2633,13 +2631,13 @@ class EventListenerConfig(ProcessConfig):
         from adminservice.dispatchers import PInputDispatcher
         from adminservice.dispatchers import POutputDispatcher
         from adminservice import events
-        if stdout_fd is not None:
+        if stdout_fd != None:
             dispatchers[stdout_fd] = PEventListenerDispatcher(proc, 'stdout',
                                                               stdout_fd)
-        if stderr_fd is not None:
+        if stderr_fd != None:
             etype = events.ProcessCommunicationStderrEvent
             dispatchers[stderr_fd] = POutputDispatcher(proc, etype, stderr_fd)
-        if stdin_fd is not None:
+        if stdin_fd != None:
             dispatchers[stdin_fd] = PInputDispatcher(proc, 'stdin', stdin_fd)
         return dispatchers, p
 
@@ -2648,7 +2646,7 @@ class FastCGIProcessConfig(ProcessConfig):
     req_param_names = ProcessConfig.req_param_names[:]
 
     def make_process(self, group=None):
-        if group is None:
+        if group == None:
             raise NotImplementedError('FastCGI programs require a group')
         from adminservice.process import FastCGISubprocess
         process = FastCGISubprocess(self)
@@ -2661,7 +2659,7 @@ class FastCGIProcessConfig(ProcessConfig):
         #file descriptor 0, so adminserviced cannot use stdin
         #to communicate with the child process
         stdin_fd = p['stdin']
-        if stdin_fd is not None:
+        if stdin_fd != None:
             dispatchers[stdin_fd].close()
         return dispatchers, p
 
@@ -2865,16 +2863,16 @@ def signame(sig):
     signal module.
     """
 
-    if _signames is None:
+    if _signames == None:
         _init_signames()
     return _signames.get(sig) or "signal %d" % sig
 
 def _init_signames():
     global _signames
     d = {}
-    for k, v in signal.__dict__.items():
+    for k, v in list(signal.__dict__.items()):
         k_startswith = getattr(k, "startswith", None)
-        if k_startswith is None:
+        if k_startswith == None:
             continue
         if k_startswith("SIG") and not k_startswith("SIG_"):
             d[v] = k
@@ -2900,14 +2898,14 @@ class SignalReceiver:
 def expand(s, expansions, name):
     try:
         return s % expansions
-    except KeyError, ex:
+    except KeyError as ex:
         available = list(expansions.keys())
         available.sort()
         raise ValueError(
             'Format string %r for %r contains names (%s) which cannot be '
             'expanded. Available names: %s' %
             (s, name, str(ex), ", ".join(available)))
-    except Exception, ex:
+    except Exception as ex:
         raise ValueError(
             'Format string %r for %r is badly formatted: %s' %
             (s, name, str(ex))

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # An example process which emits a stdout process communication event every
 # second (or every number of seconds specified as a single argument).

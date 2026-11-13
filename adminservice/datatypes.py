@@ -4,7 +4,7 @@ import pwd
 import signal
 import socket
 import shlex
-import urlparse
+import urllib.parse
 from adminservice.loggers import getLevelNumByDescription
 
 def process_or_group_name(name_arr):
@@ -20,7 +20,7 @@ def integer(value):
     try:
         return int(value)
     except (ValueError, OverflowError):
-        return long(value) # why does this help ValueError? (CM)
+        return int(value) # why does this help ValueError? (CM)
 
 TRUTHY_STRINGS = ('yes', 'true', 'on', '1')
 FALSY_STRINGS  = ('no', 'false', 'off', '0')
@@ -48,7 +48,7 @@ def list_of_ints(arg):
         return []
     else:
         try:
-            return map(int, arg.split(","))
+            return list(map(int, arg.split(",")))
         except:
             raise ValueError("not a valid list of ints: " + repr(arg))
 
@@ -118,10 +118,10 @@ class RangeCheckedConversion:
 
     def __call__(self, value):
         v = self._conversion(value)
-        if self._min is not None and v < self._min:
+        if self._min != None and v < self._min:
             raise ValueError("%s is below lower bound (%s)"
                              % (repr(v), repr(self._min)))
-        if self._max is not None and v > self._max:
+        if self._max != None and v > self._max:
             raise ValueError("%s is above upper bound (%s)"
                              % (repr(v), repr(self._max)))
         return v
@@ -252,18 +252,18 @@ class UnixStreamSocketConfig(SocketConfig):
         return self.owner
 
     def _chmod(self):
-        if self.mode is not None:
+        if self.mode != None:
             try:
                 os.chmod(self.path, self.mode)
-            except Exception, e:
+            except Exception as e:
                 raise ValueError("Could not change permissions of socket "
                                     + "file: %s" % (e))
 
     def _chown(self):
-        if self.owner is not None:
+        if self.owner != None:
             try:
                 os.chown(self.path, self.owner[0], self.owner[1])
-            except Exception, e:
+            except Exception as e:
                 raise ValueError("Could not change ownership of socket file: "
                                     + "%s" % (e))
 
@@ -352,7 +352,7 @@ def existing_dirpath(v):
 def logging_level(value):
     s = str(value).lower()
     level = getLevelNumByDescription(s)
-    if level is None:
+    if level == None:
         raise ValueError('bad logging level name %r' % value)
     return level
 
@@ -365,28 +365,28 @@ class SuffixMultiplier:
         self._default = default
         # all keys must be the same size
         self._keysz = None
-        for k in d.keys():
-            if self._keysz is None:
+        for k in list(d.keys()):
+            if self._keysz == None:
                 self._keysz = len(k)
             else:
                 assert self._keysz == len(k)
 
     def __call__(self, v):
         v = v.lower()
-        for s, m in self._d.items():
+        for s, m in list(self._d.items()):
             if v[-self._keysz:] == s:
                 return int(v[:-self._keysz]) * m
         return int(v) * self._default
 
 byte_size = SuffixMultiplier({'kb': 1024,
                               'mb': 1024*1024,
-                              'gb': 1024*1024*1024L,})
+                              'gb': 1024*1024*1024,})
 
 def url(value):
     # earlier Python 2.6 urlparse (2.6.4 and under) can't parse unix:// URLs,
     # later ones can but we need to straddle
     uri = value.replace('unix://', 'http://', 1).strip()
-    scheme, netloc, path, params, query, fragment = urlparse.urlparse(uri)
+    scheme, netloc, path, params, query, fragment = urllib.parse.urlparse(uri)
     if scheme and (netloc or path):
         return value
     raise ValueError("value %r is not a URL" % value)
@@ -402,7 +402,7 @@ def signal_number(value):
         if not name.startswith('SIG'):
             name = 'SIG' + name
         num = getattr(signal, name, None)
-        if num is None:
+        if num == None:
             raise ValueError('value %r is not a valid signal name' % value)
     if num not in SIGNUMS:
         raise ValueError('value %r is not a valid signal number' % value)
@@ -453,7 +453,7 @@ def debug_level(value):
         num = int(value)
     except (ValueError, TypeError):
         value = str(value.lower())
-        if not DEBUG_LEVEL.has_key(value):
+        if value not in DEBUG_LEVEL:
             raise ValueError("invalid 'DEBUG_LEVEL' value %s" % value)
         num = DEBUG_LEVEL[value]
         

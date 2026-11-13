@@ -3,7 +3,7 @@ import re
 import cgi
 import time
 import traceback
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import datetime
 
 from adminservice.medusa import producers
@@ -43,7 +43,7 @@ class DeferredWebProducer:
             return ''
         try:
             response = self.callback()
-            if response is NOT_DONE_YET:
+            if response == NOT_DONE_YET:
                 return NOT_DONE_YET
 
             self.finished = True
@@ -62,7 +62,7 @@ class DeferredWebProducer:
         for header in headers:
             self.request[header] = headers[header]
 
-        if not self.request.has_key('Content-Type'):
+        if 'Content-Type' not in self.request:
             self.request['Content-Type'] = 'text/plain'
 
         if headers.get('Location'):
@@ -82,7 +82,7 @@ class DeferredWebProducer:
 
         if self.request.version == '1.0':
             if connection == 'keep-alive':
-                if not self.request.has_key('Content-Length'):
+                if 'Content-Length' not in self.request:
                     close_it = 1
                 else:
                     self.request['Connection'] = 'Keep-Alive'
@@ -91,8 +91,8 @@ class DeferredWebProducer:
         elif self.request.version == '1.1':
             if connection == 'close':
                 close_it = 1
-            elif not self.request.has_key ('Content-Length'):
-                if self.request.has_key ('Transfer-Encoding'):
+            elif 'Content-Length' not in self.request:
+                if 'Transfer-Encoding' in self.request:
                     if not self.request['Transfer-Encoding'] == 'chunked':
                         close_it = 1
                 elif self.request.use_chunked:
@@ -100,7 +100,7 @@ class DeferredWebProducer:
                     wrap_in_chunking = 1
                 else:
                     close_it = 1
-        elif self.request.version is None:
+        elif self.request.version == None:
             close_it = 1
 
         outgoing_header = producers.simple_producer (
@@ -160,7 +160,7 @@ class MeldView:
 
     def __call__(self):
         body = self.render()
-        if body is NOT_DONE_YET:
+        if body == NOT_DONE_YET:
             return NOT_DONE_YET
 
         response = self.context.response
@@ -199,7 +199,7 @@ class TailView(MeldView):
                 try:
                     tail = rpcinterface.readProcessStdoutLog(processname,
                                                              limit, offset)
-                except RPCError, e:
+                except RPCError as e:
                     if e.code == Faults.NO_FILE:
                         tail = 'No file for %s' % processname
                     else:
@@ -214,10 +214,10 @@ class TailView(MeldView):
         tailbody.content(tail)
 
         refresh_anchor = root.findmeld('refresh_anchor')
-        if processname is not None:
+        if processname != None:
             refresh_anchor.attributes(
                 href='tail.html?processname=%s&limit=%s' % (
-                    urllib.quote(processname), urllib.quote(str(abs(limit)))
+                    urllib.parse.quote(processname), urllib.parse.quote(str(abs(limit)))
                     )
             )
         else:
@@ -228,7 +228,7 @@ class TailView(MeldView):
 class StatusView(MeldView):
     def actions_for_process(self, process):
         state = process.get_state()
-        processname = urllib.quote(make_namespec(process.group.config.name,
+        processname = urllib.parse.quote(make_namespec(process.group.config.name,
                                                  process.config.name))
         start = {
         'name':'Start',
@@ -294,7 +294,7 @@ class StatusView(MeldView):
             elif action == 'stopall':
                 callback = rpcinterface.adminservice.stopAllProcesses()
                 def stopall():
-                    if callback() is NOT_DONE_YET:
+                    if callback() == NOT_DONE_YET:
                         return NOT_DONE_YET
                     else:
                         return 'All stopped at %s' % time.ctime()
@@ -307,7 +307,7 @@ class StatusView(MeldView):
                       {'methodName':'adminservice.startAllProcesses'} ] )
                 def restartall():
                     result = callback()
-                    if result is NOT_DONE_YET:
+                    if result == NOT_DONE_YET:
                         return NOT_DONE_YET
                     return 'All restarted at %s' % time.ctime()
                 restartall.delay = 0.05
@@ -319,10 +319,10 @@ class StatusView(MeldView):
                 wrong.delay = 0.05
                 group_name, process_name = split_namespec(namespec)
                 group = adminserviced.process_groups.get(group_name)
-                if group is None:
+                if group == None:
                     return wrong
                 process = group.processes.get(process_name)
-                if process is None:
+                if process == None:
                     return wrong
 
                 if action == 'start':
@@ -330,7 +330,7 @@ class StatusView(MeldView):
                         bool_or_callback = (
                             rpcinterface.adminservice.startProcess(namespec)
                             )
-                    except RPCError, e:
+                    except RPCError as e:
                         if e.code == Faults.NO_FILE:
                             msg = 'no such file'
                         elif e.code == Faults.NOT_EXECUTABLE:
@@ -353,7 +353,7 @@ class StatusView(MeldView):
                         def startprocess():
                             try:
                                 result = bool_or_callback()
-                            except RPCError, e:
+                            except RPCError as e:
                                 if e.code == Faults.SPAWN_ERROR:
                                     msg = 'spawn error'
                                 elif e.code == Faults.ABNORMAL_TERMINATION:
@@ -363,7 +363,7 @@ class StatusView(MeldView):
                                         e.code, e.text)
                                 return 'ERROR: Process %s: %s' % (namespec, msg)
 
-                            if result is NOT_DONE_YET:
+                            if result == NOT_DONE_YET:
                                 return NOT_DONE_YET
                             return 'Process %s started' % namespec
                         startprocess.delay = 0.05
@@ -379,7 +379,7 @@ class StatusView(MeldView):
                         bool_or_callback = (
                             rpcinterface.adminservice.stopProcess(namespec)
                             )
-                    except RPCError, e:
+                    except RPCError as e:
                         def stoperr():
                             return 'unexpected rpc fault [%d] %s' % (
                                 e.code, e.text)
@@ -390,10 +390,10 @@ class StatusView(MeldView):
                         def stopprocess():
                             try:
                                 result = bool_or_callback()
-                            except RPCError, e:
+                            except RPCError as e:
                                 return 'unexpected rpc fault [%d] %s' % (
                                     e.code, e.text)
-                            if result is NOT_DONE_YET:
+                            if result == NOT_DONE_YET:
                                 return NOT_DONE_YET
                             return 'Process %s stopped' % namespec
                         stopprocess.delay = 0.05
@@ -416,7 +416,7 @@ class StatusView(MeldView):
                         callback = results_or_callback
                         def restartprocess():
                             results = callback()
-                            if results is NOT_DONE_YET:
+                            if results == NOT_DONE_YET:
                                 return NOT_DONE_YET
                             return 'Process %s restarted' % namespec
                         restartprocess.delay = 0.05
@@ -431,7 +431,7 @@ class StatusView(MeldView):
                     try:
                         callback = rpcinterface.adminservice.clearProcessLogs(
                             namespec)
-                    except RPCError, e:
+                    except RPCError as e:
                         def clearerr():
                             return 'unexpected rpc fault [%d] %s' % (
                                 e.code, e.text)
@@ -459,11 +459,11 @@ class StatusView(MeldView):
 
             else:
                 message =  self.callback()
-                if message is NOT_DONE_YET:
+                if message == NOT_DONE_YET:
                     return NOT_DONE_YET
-                if message is not None:
+                if message != None:
                     server_url = form['SERVER_URL']
-                    location = server_url + "/" + '?message=%s' % urllib.quote(
+                    location = server_url + "/" + '?message=%s' % urllib.parse.quote(
                         message)
                     response['headers']['Location'] = location
 
@@ -474,9 +474,9 @@ class StatusView(MeldView):
             )
 
         processnames = []
-        groups = adminserviced.process_groups.values()
+        groups = list(adminserviced.process_groups.values())
         for group in groups:
-            gprocnames = group.processes.keys()
+            gprocnames = list(group.processes.keys())
             for gprocname in gprocnames:
                 processnames.append((group.config.name, gprocname))
 
@@ -499,7 +499,7 @@ class StatusView(MeldView):
 
         root = self.clone()
 
-        if message is not None:
+        if message != None:
             statusarea = root.findmeld('statusmessage')
             statusarea.attrib['class'] = 'status_msg'
             statusarea.content(message)
@@ -520,7 +520,7 @@ class StatusView(MeldView):
                 anchor = tr_element.findmeld('name_anchor')
                 processname = make_namespec(item['group'], item['name'])
                 anchor.attributes(href='tail.html?processname=%s' %
-                                  urllib.quote(processname))
+                                  urllib.parse.quote(processname))
                 anchor.content(processname)
 
                 actions = item['actions']
@@ -528,7 +528,7 @@ class StatusView(MeldView):
 
                 for li_element, actionitem in actionitem_td.repeat(actions):
                     anchor = li_element.findmeld('actionitem_anchor')
-                    if actionitem is None:
+                    if actionitem == None:
                         anchor.attrib['class'] = 'hidden'
                     else:
                         anchor.attributes(href=actionitem['href'],
@@ -591,7 +591,7 @@ class adminservice_ui_handler:
         if not path:
             path = 'index.html'
 
-        for viewname in VIEWS.keys():
+        for viewname in list(VIEWS.keys()):
             if viewname == path:
                 return True
 
@@ -605,7 +605,7 @@ class adminservice_ui_handler:
         form = {}
         cgi_env = request.cgi_environment()
         form.update(cgi_env)
-        if not form.has_key('QUERY_STRING'):
+        if 'QUERY_STRING' not in form:
             form['QUERY_STRING'] = ''
 
         query = form['QUERY_STRING']
@@ -614,7 +614,7 @@ class adminservice_ui_handler:
         form_urlencoded = cgi.parse_qsl(data)
         query_data = cgi.parse_qs(query)
 
-        for k, v in query_data.items():
+        for k, v in list(query_data.items()):
             # ignore dupes
             form[k] = v[0]
 
@@ -632,7 +632,7 @@ class adminservice_ui_handler:
             path = 'index.html'
 
         viewinfo = VIEWS.get(path)
-        if viewinfo is None:
+        if viewinfo == None:
             # this should never happen if our match method works
             return
 

@@ -7,8 +7,8 @@
 
 VERSION = "$Id: xmlrpc_handler.py,v 1.6 2004/04/21 14:09:24 akuchling Exp $"
 
-import http_server
-import xmlrpclib
+from . import http_server
+import xmlrpc.client
 
 import string
 import sys
@@ -31,7 +31,7 @@ class xmlrpc_handler:
             request.error (400)
 
     def continue_request (self, data, request):
-        params, method = xmlrpclib.loads (data)
+        params, method = xmlrpc.client.loads (data)
         try:
             # generate response
             try:
@@ -40,11 +40,11 @@ class xmlrpc_handler:
                     response = (response,)
             except:
                 # report exception back to server
-                response = xmlrpclib.dumps (
-                        xmlrpclib.Fault (1, "%s:%s" % (sys.exc_type, sys.exc_value))
+                response = xmlrpc.client.dumps (
+                        xmlrpc.client.Fault (1, "%s:%s" % (sys.exc_info()[0], sys.exc_info()[1]))
                         )
             else:
-                response = xmlrpclib.dumps (response, methodresponse=1)
+                response = xmlrpc.client.dumps (response, methodresponse=1)
         except:
             # internal error, report as HTTP server error
             request.error (500)
@@ -91,10 +91,10 @@ if __name__ == '__main__':
     class rpc_demo (xmlrpc_handler):
 
         def call (self, method, params):
-            print 'method="%s" params=%s' % (method, params)
+            print('method="%s" params=%s' % (method, params))
             return "Sure, that works"
 
-    import asyncore_25 as asyncore
+    from . import asyncore_25 as asyncore
 
     hs = http_server.http_server ('', 8000)
     rpc = rpc_demo()

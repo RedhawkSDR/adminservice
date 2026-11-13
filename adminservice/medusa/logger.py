@@ -1,6 +1,6 @@
 # -*- Mode: Python -*-
 
-import asynchat_25 as asynchat
+from . import asynchat_25 as asynchat
 import socket
 import time         # these three are for the rotating logger
 import os           # |
@@ -150,7 +150,7 @@ class rotating_file_logger (file_logger):
 # TODO: async version of syslog_client: now, log entries use blocking
 # send()
 
-import m_syslog
+from . import m_syslog
 syslog_logger = m_syslog.syslog_client
 
 class syslog_logger (m_syslog.syslog_client):

@@ -101,11 +101,11 @@ def readwrite(obj, flags):
         obj.handle_error()
 
 def poll(timeout=0.0, map=None):
-    if map is None:
+    if map == None:
         map = socket_map
     if map:
         r = []; w = []; e = []
-        for fd, obj in map.items():
+        for fd, obj in list(map.items()):
             is_r = obj.readable()
             is_w = obj.writable()
             if is_r:
@@ -119,7 +119,7 @@ def poll(timeout=0.0, map=None):
         else:
             try:
                 r, w, e = select.select(r, w, e, timeout)
-            except select.error, err:
+            except select.error as err:
                 if err.args[0] != EINTR:
                     raise
                 else:
@@ -127,32 +127,32 @@ def poll(timeout=0.0, map=None):
 
         for fd in r:
             obj = map.get(fd)
-            if obj is None:
+            if obj == None:
                 continue
             read(obj)
 
         for fd in w:
             obj = map.get(fd)
-            if obj is None:
+            if obj == None:
                 continue
             write(obj)
 
         for fd in e:
             obj = map.get(fd)
-            if obj is None:
+            if obj == None:
                 continue
             _exception(obj)
 
 def poll2(timeout=0.0, map=None):
     # Use the poll() support added to the select module in Python 2.0
-    if map is None:
+    if map == None:
         map = socket_map
-    if timeout is not None:
+    if timeout != None:
         # timeout is in milliseconds
         timeout = int(timeout*1000)
     pollster = select.poll()
     if map:
-        for fd, obj in map.items():
+        for fd, obj in list(map.items()):
             flags = 0
             if obj.readable():
                 flags |= select.POLLIN | select.POLLPRI
@@ -165,20 +165,20 @@ def poll2(timeout=0.0, map=None):
                 pollster.register(fd, flags)
         try:
             r = pollster.poll(timeout)
-        except select.error, err:
+        except select.error as err:
             if err.args[0] != EINTR:
                 raise
             r = []
         for fd, flags in r:
             obj = map.get(fd)
-            if obj is None:
+            if obj == None:
                 continue
             readwrite(obj, flags)
 
 poll3 = poll2                           # Alias for backward compatibility
 
 def loop(timeout=30.0, use_poll=False, map=None, count=None):
-    if map is None:
+    if map == None:
         map = socket_map
 
     if use_poll and hasattr(select, 'poll'):
@@ -186,7 +186,7 @@ def loop(timeout=30.0, use_poll=False, map=None, count=None):
     else:
         poll_fun = poll
 
-    if count is None:
+    if count == None:
         while map:
             poll_fun(timeout, map)
 
@@ -204,7 +204,7 @@ class dispatcher:
     addr = None
 
     def __init__(self, sock=None, map=None):
-        if map is None:
+        if map == None:
             self._map = socket_map
         else:
             self._map = map
@@ -230,7 +230,7 @@ class dispatcher:
             status.append('listening')
         elif self.connected:
             status.append('connected')
-        if self.addr is not None:
+        if self.addr != None:
             try:
                 status.append('%s:%d' % self.addr)
             except TypeError:
@@ -239,15 +239,15 @@ class dispatcher:
 
     def add_channel(self, map=None):
         #self.log_info('adding channel %s' % self)
-        if map is None:
+        if map == None:
             map = self._map
         map[self._fileno] = self
 
     def del_channel(self, map=None):
         fd = self._fileno
-        if map is None:
+        if map == None:
             map = self._map
-        if map.has_key(fd):
+        if fd in map:
             #self.log_info('closing channel %d:%s' % (fd, self))
             del map[fd]
         self._fileno = None
@@ -320,7 +320,7 @@ class dispatcher:
         try:
             conn, addr = self.socket.accept()
             return conn, addr
-        except socket.error, why:
+        except socket.error as why:
             if why.args[0] == EWOULDBLOCK:
                 pass
             else:
@@ -330,7 +330,7 @@ class dispatcher:
         try:
             result = self.socket.send(data)
             return result
-        except socket.error, why:
+        except socket.error as why:
             if why.args[0] == EWOULDBLOCK:
                 return 0
             else:
@@ -347,7 +347,7 @@ class dispatcher:
                 return ''
             else:
                 return data
-        except socket.error, why:
+        except socket.error as why:
             # winsock sometimes throws ENOTCONN
             if why.args[0] in [ECONNRESET, ENOTCONN, ESHUTDOWN]:
                 self.handle_close()
@@ -373,7 +373,7 @@ class dispatcher:
 
     def log_info(self, message, type='info'):
         if __debug__ or type != 'info':
-            print '%s: %s' % (type, message)
+            print('%s: %s' % (type, message))
 
     def handle_read_event(self):
         if self.accepting:
@@ -490,9 +490,9 @@ def compact_traceback():
     return (file, function, line), t, v, info
 
 def close_all(map=None):
-    if map is None:
+    if map == None:
         map = socket_map
-    for x in map.values():
+    for x in list(map.values()):
         x.socket.close()
     map.clear()
 

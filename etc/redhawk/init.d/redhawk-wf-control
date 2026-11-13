@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 __MANPAGE__
 
@@ -275,10 +275,10 @@ def getDomainManager(domainName, delay=0):
 
         # Attach to domain
         domain = redhawk.base.attach(domainName)
-        while time.time() <= delay_time and domain is None:
+        while time.time() <= delay_time and domain ==None:
             domain = redhawk.base.attach(domainName)
             sleep(1)
-        if domain is None:
+        if domain == None:
             raise Exception("Domain unavailable after waiting for %d." % delay)
 
         # we got the domain, so no longer need the timeout
@@ -385,13 +385,13 @@ def getAppFactory(dom, waveURI):
 
 def saveToPidFile(opts, waveformID):
     pidFile = opts.pidFile
-    if pidFile is not None:
+    if pidFile != None:
         waveformName = opts.waveformName
         instanceName = opts.instanceName
         output = sys.argv[0] + " -d " + opts.domainName
-        if waveformName is not None:
+        if waveformName != None:
             output += " --waveform " + waveformName
-        if instanceName is not None:
+        if instanceName != None:
             output += " --instance-name " + instanceName
         output += " --waveform-id=" + waveformID
         try:
@@ -433,7 +433,7 @@ def removeWaveform(dom, opts):
 
     waveform = None
     for app in dom.apps:
-        if waveformID is not None:
+        if waveformID != None:
             if app._get_identifier() == waveformID:
                 waveform = app
                 print "Releasing waveform %s. Please wait..." % waveformID
@@ -462,7 +462,7 @@ def showStatus(dom, opts):
     if none is given, in the provided dom. """
 
     waveformID = opts.waveformID
-    searchName = opts.waveformName if opts.instanceName is None else opts.instanceName
+    searchName = opts.waveformName if opts.instanceName ==None else opts.instanceName
     if not opts.waveformName and not opts.instanceName and not opts.quiet:
         listAllAvailableWaveforms(dom)
     else: 
@@ -477,7 +477,7 @@ def showStatus(dom, opts):
                 if searchName and app._get_name().startswith(searchName):
                     running = displayWaveformStatus(opts, app, searchName) 
                     found = True
-            if not found and waveformName is not None:
+            if not found and waveformName != None:
                 for app in dom.apps:
                     if waveformName and app._get_name().startswith(waveformName):
                         running = displayWaveformStatus(opts, app, waveformName) 

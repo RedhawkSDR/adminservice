@@ -17,17 +17,15 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 #
-%if 0%{?fedora} >= 17 || 0%{?rhel} >=7
-%global with_systemd 1
-%endif
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?_ossiehome:  %define _ossiehome  /usr/local/redhawk/core}
+%global __python %{__python3}
 %define _prefix %{_ossiehome}
 Prefix:         %{_prefix}
 
 Name:           redhawk-adminservice
-Version:        2.3.0
-Release:        5%{?dist}
+Version:        4.0
+Release:        1%{?dist}
 Summary:        Redhawk Admin Service
 
 Group:          Applications/Engineering
@@ -38,15 +36,15 @@ Vendor:         REDHAWK
 
 BuildArch:      noarch
 
-Requires:       python
+Requires:       python3
 Requires:       redhawk >= 2.0
 Requires(pre):  redhawk >= 2.0
-Requires:       python-meld3
-Requires:       python-tornado
-Requires:       python-zmq
+Requires:       python3-meld3
+Requires:       python3-tornado
+Requires:       python3-zmq
 
-BuildRequires:  python-setuptools
-BuildRequires:  python-devel >= 2.4
+BuildRequires:  python3-setuptools
+BuildRequires:  python3-devel >= 2.4
 %if 0%{?with_systemd}
 %{?systemd_requires}
 BuildRequires:   systemd

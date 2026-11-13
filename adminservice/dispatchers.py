@@ -123,22 +123,22 @@ class POutputDispatcher(PDispatcher):
         self.log_to_mainlog = config.options.loglevel <= self.mainlog_level
         self.stdout_events_enabled = config.stdout_events_enabled
         self.stderr_events_enabled = config.stderr_events_enabled
-        if logfile != 'syslog' and logfile is not None:
+        if logfile != 'syslog' and logfile != None:
             uid = getattr(config, 'uid', None)
             gid = getattr(config, 'gid', None)
-            if uid is not None and gid is not None:
+            if uid != None and gid != None:
                 os.chown(logfile, uid, gid)
 
     def removelogs(self):
         for log in (self.mainlog, self.capturelog):
-            if log is not None:
+            if log != None:
                 for handler in log.handlers:
                     handler.remove()
                     handler.reopen()
 
     def reopenlogs(self):
         for log in (self.mainlog, self.capturelog):
-            if log is not None:
+            if log != None:
                 for handler in log.handlers:
                     handler.reopen()
 
@@ -168,7 +168,7 @@ class POutputDispatcher(PDispatcher):
                     )
 
     def record_output(self):
-        if self.capturelog is None:
+        if self.capturelog == None:
             # shortcut trying to find capture data
             data = self.output_buffer
             self.output_buffer = ''
@@ -206,7 +206,7 @@ class POutputDispatcher(PDispatcher):
     def toggle_capturemode(self):
         self.capturemode = not self.capturemode
 
-        if self.capturelog is not None:
+        if self.capturelog != None:
             if self.capturemode:
                 self.childlog = self.capturelog
             else:
@@ -283,13 +283,13 @@ class PEventListenerDispatcher(PDispatcher):
                 backups=backups)
 
     def removelogs(self):
-        if self.childlog is not None:
+        if self.childlog != None:
             for handler in self.childlog.handlers:
                 handler.remove()
                 handler.reopen()
 
     def reopenlogs(self):
-        if self.childlog is not None:
+        if self.childlog != None:
             for handler in self.childlog.handlers:
                 handler.reopen()
 
@@ -364,7 +364,7 @@ class PEventListenerDispatcher(PDispatcher):
             return
 
         elif state == EventListenerStates.BUSY:
-            if self.resultlen is None:
+            if self.resultlen == None:
                 # we haven't begun gathering result data yet
                 pos = data.find('\n')
                 if pos == -1:
@@ -474,7 +474,7 @@ class PInputDispatcher(PDispatcher):
         if self.input_buffer:
             try:
                 self.flush()
-            except OSError, why:
+            except OSError as why:
                 if why.args[0] == errno.EPIPE:
                     self.input_buffer = ''
                     self.close()

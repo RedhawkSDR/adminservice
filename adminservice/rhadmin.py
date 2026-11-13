@@ -1,4 +1,4 @@
-#!/usr/bin/env python -u
+#!/usr/bin/env python3 -u
 
 """rhadmin -- control applications run by adminserviced from the cmd line.
 
@@ -26,9 +26,9 @@ import cmd
 import errno
 import getpass
 import glob
-import xmlrpclib
+import xmlrpc.client as xmlrpc_client
 import socket
-import urlparse
+import urllib.parse
 import re
 import os
 import sys
@@ -173,7 +173,7 @@ class Controller(cmd.Cmd):
         cmd, arg, line = self.parseline(line)
         if not line:
             return self.emptyline()
-        if cmd is None:
+        if cmd == None:
             return self.default(line)
         self._complete_info = None
         self.lastcmd = line
@@ -182,16 +182,16 @@ class Controller(cmd.Cmd):
             return self.default(line)
         else:
             do_func = self._get_do_func(cmd)
-            if do_func is None:
+            if do_func == None:
                 return self.default(line)
             try:
                 try:
                     return do_func(arg)
-                except xmlrpclib.ProtocolError, e:
+                except xmlrpc_client.ProtocolError as e:
                     if e.errcode == 401:
                         if self.options.interactive:
                             self.output('Server requires authentication')
-                            username = raw_input('Username:')
+                            username = input('Username:')
                             password = getpass.getpass(prompt='Password:')
                             self.output('')
                             self.options.username = username
@@ -217,21 +217,21 @@ class Controller(cmd.Cmd):
         if not func:
             for plugin in self.options.plugins:
                 func = getattr(plugin, func_name, None)
-                if func is not None:
+                if func != None:
                     break
         return func
 
     def output(self, message):
-        if isinstance(message, unicode):
+        if isinstance(message, str):
             message = message.encode('utf-8')
-        self.stdout.write(message + '\n')
+        self.stdout.write(str(message) + '\n')
 
     def get_adminservice(self):
         return self.get_server_proxy('adminservice')
 
     def get_server_proxy(self, namespace=None):
         proxy = self.options.getServerProxy()
-        if namespace is None:
+        if namespace == None:
             return proxy
         else:
             return getattr(proxy, namespace)
@@ -247,7 +247,7 @@ class Controller(cmd.Cmd):
                     'talk to a server with API version %s, but the '
                     'remote version is %s.' % (rpcinterface.API_VERSION, api))
                 return False
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             if e.faultCode == xmlrpc.Faults.UNKNOWN_METHOD:
                 self.output(
                     'Sorry, adminserviced responded but did not recognize '
@@ -257,7 +257,7 @@ class Controller(cmd.Cmd):
                     'configuration file (see sample.conf).')
                 return False
             raise
-        except socket.error, e:
+        except socket.error as e:
             if e.args[0] == errno.ECONNREFUSED:
                 self.output('%s refused connection' % self.options.serverurl)
                 return False
@@ -273,7 +273,7 @@ class Controller(cmd.Cmd):
         as complete(text, state) where text is a fragment to complete and
         state is an integer (0..n).  Each call returns a string with a new
         completion.  When no more are available, None is returned."""
-        if line is None: # line is only set in tests
+        if line == None: # line is only set in tests
             import readline
             line = readline.get_line_buffer()
 
@@ -338,7 +338,7 @@ class Controller(cmd.Cmd):
         """Get all process info used for completion.  We cache this between
         commands to reduce XML-RPC calls because readline may call
         complete() many times if the user hits tab only once."""
-        if self._complete_info is None:
+        if self._complete_info == None:
             self._complete_info = self.get_adminservice().getAllProcessInfo()
         return self._complete_info
 
@@ -439,7 +439,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             # always sends a Connection: close header).  We use a
             # homegrown client based on asyncore instead.  This makes
             # me sad.
-            if self.listener is None:
+            if self.listener == None:
                 listener = http_client.Listener()
             else:
                 listener = self.listener # for unit tests
@@ -489,7 +489,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         bytes = 1600
 
-        if modifier is not None:
+        if modifier != None:
             what = modifier[1:]
             if what == 'f':
                 bytes = None
@@ -502,18 +502,18 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         adminservice = self.ctl.get_adminservice()
 
-        if bytes is None:
+        if bytes == None:
             return self._tailf('/logtail/%s/%s' % (name, channel))
 
         else:
             try:
-                if channel is 'stdout':
+                if channel == 'stdout':
                     output = adminservice.readProcessStdoutLog(name,
                                                              -bytes, 0)
                 else: # if channel is 'stderr'
                     output = adminservice.readProcessStderrLog(name,
                                                              -bytes, 0)
-            except xmlrpclib.Fault, e:
+            except xmlrpc_client.Fault as e:
                 template = '%s: ERROR (%s)'
                 if e.faultCode == xmlrpc.Faults.NO_FILE:
                     self.ctl.output(template % (name, 'no log file'))
@@ -573,7 +573,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         try:
             output = adminservice.readLog(-bytes, 0)
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             template = '%s: ERROR (%s)'
             if e.faultCode == xmlrpc.Faults.NO_FILE:
                 self.ctl.output(template % ('adminserviced', 'no log file'))
@@ -644,7 +644,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
                 for info in all_infos:
                     matched = info['group'] == group_name
-                    if process_name is not None:
+                    if process_name != None:
                         matched = matched and info['name'] == process_name
 
                     if matched:
@@ -652,7 +652,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                         matching_infos.append(info)
 
                 if bad_name:
-                    if process_name is None:
+                    if process_name == None:
                         msg = "%s: ERROR (no such group)" % group_name
                     else:
                         msg = "%s: ERROR (no such process)" % name
@@ -684,7 +684,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             for name in names:
                 try:
                     info = adminservice.getProcessInfo(name)
-                except xmlrpclib.Fault, e:
+                except xmlrpc_client.Fault as e:
                     if e.faultCode == xmlrpc.Faults.BAD_NAME:
                         self.ctl.output('No such process %s' % name)
                     else:
@@ -771,13 +771,13 @@ class DefaultControllerPlugin(ControllerPluginBase):
         else:
             for name in names:
                 group_name, process_name = split_namespec(name)
-                if process_name is None:
+                if process_name == None:
                     try:
                         results = adminservice.startProcessGroup(group_name, force, type_to_start)
                         for result in results:
                             result = self._startresult(result)
                             self.ctl.output(result)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         if e.faultCode == xmlrpc.Faults.BAD_NAME:
                             error = "%s: ERROR (no such group)" % group_name
                             self.ctl.output(error)
@@ -795,7 +795,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                         continue
                     try:
                         result = adminservice.startProcess(name, force)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         error = self._startresult({'status': e.faultCode,
                                                    'name': process_name,
                                                    'group': group_name,
@@ -861,13 +861,13 @@ class DefaultControllerPlugin(ControllerPluginBase):
         else:
             for name in names:
                 group_name, process_name = split_namespec(name)
-                if process_name is None:
+                if process_name == None:
                     try:
                         results = adminservice.stopProcessGroup(group_name, type_to_stop)
                         for result in results:
                             result = self._stopresult(result)
                             self.ctl.output(result)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         if e.faultCode == xmlrpc.Faults.BAD_NAME:
                             error = "%s: ERROR (no such group)" % group_name
                             self.ctl.output(error)
@@ -876,7 +876,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 else:
                     try:
                         result = adminservice.stopProcess(name)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         error = self._stopresult({'status': e.faultCode,
                                                   'name': process_name,
                                                   'group': group_name,
@@ -920,7 +920,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         else:
             for name in names:
                 group_name, process_name = split_namespec(name)
-                if process_name is None:
+                if process_name == None:
                     try:
                         results = adminservice.signalProcessGroup(
                             group_name, sig
@@ -928,7 +928,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                         for result in results:
                             result = self._signalresult(result)
                             self.ctl.output(result)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         if e.faultCode == xmlrpc.Faults.BAD_NAME:
                             error = "%s: ERROR (no such group)" % group_name
                             self.ctl.output(error)
@@ -937,7 +937,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 else:
                     try:
                         adminservice.signalProcess(name, sig)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         error = self._signalresult({'status': e.faultCode,
                                                     'name': process_name,
                                                     'group': group_name,
@@ -981,7 +981,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
     def do_shutdown(self, arg):
         if self.ctl.options.interactive:
-            yesno = raw_input('Really shut the remote adminserviced process '
+            yesno = input('Really shut the remote adminserviced process '
                               'down y/N? ')
             really = yesno.lower().startswith('y')
         else:
@@ -991,12 +991,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
             adminservice = self.ctl.get_adminservice()
             try:
                 adminservice.shutdown()
-            except xmlrpclib.Fault, e:
+            except xmlrpc_client.Fault as e:
                 if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                     self.ctl.output('ERROR: already shutting down')
                 else:
                     raise
-            except socket.error, e:
+            except socket.error as e:
                 if e.args[0] == errno.ECONNREFUSED:
                     msg = 'ERROR: %s refused connection (already shut down?)'
                     self.ctl.output(msg % self.ctl.options.serverurl)
@@ -1018,7 +1018,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             return
 
         if self.ctl.options.interactive:
-            yesno = raw_input('Really restart the remote adminserviced process '
+            yesno = input('Really restart the remote adminserviced process '
                               'y/N? ')
             really = yesno.lower().startswith('y')
         else:
@@ -1027,7 +1027,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             adminservice = self.ctl.get_adminservice()
             try:
                 adminservice.restart()
-            except xmlrpclib.Fault, e:
+            except xmlrpc_client.Fault as e:
                 if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                     self.ctl.output('ERROR: already shutting down')
                 else:
@@ -1044,7 +1044,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         for n, t in [(added, 'available'),
                      (changed, 'changed'),
                      (dropped, 'disappeared')]:
-            changedict.update(dict(zip(n, [t] * len(n))))
+            changedict.update(dict(list(zip(n, [t] * len(n)))))
 
         if changedict:
             names = list(changedict.keys())
@@ -1084,7 +1084,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         adminservice = self.ctl.get_adminservice()
         try:
             configinfo = adminservice.getAllConfigInfo()
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                 self.ctl.output('ERROR: adminservice shutting down')
             else:
@@ -1112,7 +1112,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         adminservice = self.ctl.get_adminservice()
         try:
             configinfo = adminservice.getConfigInfo(True, configproc)
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                 self.ctl.output('ERROR: adminservice shutting down')
             else:
@@ -1122,7 +1122,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
             for pinfo in configinfo:
                 if not desiredconfigs: 
                     self.ctl.output("%s Configuration:" % configproc)
-                cfgs = [(key[7:],val) for (key, val) in pinfo.items() if key.startswith("config_")]
+                cfgs = [(key[7:],val) for (key, val) in list(pinfo.items()) if key.startswith("config_")]
                 cfgs.sort()
                 for key,val in cfgs:
                     if not desiredconfigs:
@@ -1143,7 +1143,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         adminservice = self.ctl.get_adminservice()
         try:
             result = adminservice.reloadConfig()
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                 self.ctl.output('ERROR: adminservice shutting down')
             elif e.faultCode == xmlrpc.Faults.CANT_REREAD:
@@ -1163,7 +1163,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         for name in names:
             try:
                 adminservice.addProcessGroup(name)
-            except xmlrpclib.Fault, e:
+            except xmlrpc_client.Fault as e:
                 if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                     self.ctl.output('ERROR: shutting down')
                 elif e.faultCode == xmlrpc.Faults.ALREADY_ADDED:
@@ -1187,7 +1187,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         for name in names:
             try:
                 adminservice.removeProcessGroup(name)
-            except xmlrpclib.Fault, e:
+            except xmlrpc_client.Fault as e:
                 if e.faultCode == xmlrpc.Faults.STILL_RUNNING:
                     self.ctl.output('ERROR: process/group still running: %s'
                                     % name)
@@ -1210,7 +1210,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         adminservice = self.ctl.get_adminservice()
         try:
             result = adminservice.reloadConfig()
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                 self.ctl.output('ERROR: already shutting down')
                 return
@@ -1270,10 +1270,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         # Loop through all the groups that we've changed in the order that we changed them
         for gname in changed:
-            if not waitfor.has_key(gname):
+            if gname not in waitfor:
                 continue
             procs = waitfor[gname]
-            if procs is not None:
+            if procs != None:
                 # Loop through each process and get its status
                 for proc in procs:
                     procInfo = adminservice.getProcessInfo("%s:%s" % (gname, proc))
@@ -1344,7 +1344,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 group_name, process_name = split_namespec(name)
                 try:
                     result = adminservice.clearProcessLogs(name)
-                except xmlrpclib.Fault, e:
+                except xmlrpc_client.Fault as e:
                     error = self._clearresult({'status': e.faultCode,
                                                'name': process_name,
                                                'group': group_name,
@@ -1362,7 +1362,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
     def _queryresult(self, result):
         name = make_namespec(result['group'], result['name'])
-        output = result['output'] if result.has_key('output') else result['description']
+        output = result['output'] if 'output' in result else result['description']
         template = '%s: %s\n'
         return template % (name, output)
 
@@ -1391,12 +1391,12 @@ class DefaultControllerPlugin(ControllerPluginBase):
         else:
             for name in names:
                 group_name, process_name = split_namespec(name)
-                if process_name is None:
+                if process_name == None:
                     try:
                         results = adminservice.queryProcessGroup(group_name, type_to_query)
                         for result in results:
                             self.ctl.output(result['output'])
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         if e.faultCode == xmlrpc.Faults.BAD_NAME:
                             error = "%s: ERROR (no such group)" % group_name
                             self.ctl.output(error)
@@ -1406,7 +1406,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                     try:
                         result = adminservice.queryProcess(name)
                         self.ctl.output(result)
-                    except xmlrpclib.Fault, e:
+                    except xmlrpc_client.Fault as e:
                         error = self._queryresult({'name': process_name,
                                                    'group': group_name,
                                                    'description': e.faultString})
@@ -1424,7 +1424,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
     def do_open(self, arg):
         url = arg.strip()
-        parts = urlparse.urlparse(url)
+        parts = urllib.parse.urlparse(url)
         if parts[0] not in ('unix', 'http'):
             self.ctl.output('ERROR: url must be http:// or unix://')
             return
@@ -1469,7 +1469,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
         try:
             info = adminservice.getProcessInfo(name)
-        except xmlrpclib.Fault, e:
+        except xmlrpc_client.Fault as e:
             if e.faultCode == xmlrpc.Faults.BAD_NAME:
                 self.ctl.output('ERROR: bad process name supplied')
             else:
@@ -1490,10 +1490,10 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
             # this takes care of the user input
             while True:
-                inp = raw_input() + '\n'
+                inp = input() + '\n'
                 try:
                     adminservice.sendProcessStdin(name, inp)
-                except xmlrpclib.Fault, e:
+                except xmlrpc_client.Fault as e:
                     if e.faultCode == xmlrpc.Faults.NOT_RUNNING:
                         self.ctl.output('Process got killed')
                     else:
@@ -1527,7 +1527,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
 
     def do_config(self, arg):
         args = arg.split(' ')
-        if len(args) == 0 or not self.config_files.has_key(args[0]):
+        if len(args) == 0 or args[0] not in self.config_files:
             self.ctl.output('Error: incorrect config argument')
             self.help_config()
             return
@@ -1630,7 +1630,7 @@ def split_namespec(name):
     return name, None
 
 def main(args=None, options=None):
-    if options is None:
+    if options == None:
         options = ClientOptions()
 
     options.realize(args, doc=__doc__)

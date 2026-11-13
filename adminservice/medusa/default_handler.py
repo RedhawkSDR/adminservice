@@ -14,10 +14,10 @@ import stat
 import string
 
 # medusa modules
-import http_date
-import http_server
-import status_handler
-import producers
+from . import http_date
+from . import http_server
+from . import status_handler
+from . import producers
 
 unquote = http_server.unquote
 
@@ -34,7 +34,7 @@ unquote = http_server.unquote
 # class <default_with_post_handler>, defined below.
 #
 
-from counter import counter
+from .counter import counter
 
 class default_handler:
 
@@ -171,7 +171,7 @@ class default_handler:
     def set_content_type (self, path, request):
         ext = get_extension(path).lower()
         typ, encoding = mimetypes.guess_type(path)
-        if typ is not None:
+        if typ != None:
             request['Content-Type'] = typ
         else:
             # TODO: test a chunk off the front of the file for 8-bit

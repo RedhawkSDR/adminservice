@@ -1,10 +1,10 @@
 import types
 import socket
-import xmlrpclib
-import httplib
-import urllib
+import xmlrpc.client
+import http.client
+import urllib.request, urllib.parse, urllib.error
 import re
-from cStringIO import StringIO
+from io import StringIO
 import traceback
 import sys
 import base64
@@ -46,7 +46,7 @@ class RPCError(Exception):
     def __init__(self, code, extra=None):
         self.code = code
         self.text = getFaultDescription(code)
-        if extra is not None:
+        if extra != None:
             self.text = '%s: %s' % (self.text, extra)
 
     def __str__(self):
@@ -69,10 +69,10 @@ class DeferredXMLRPCResponse:
         try:
             try:
                 value = self.callback()
-                if value is NOT_DONE_YET:
+                if value == NOT_DONE_YET:
                     return NOT_DONE_YET
-            except RPCError, err:
-                value = xmlrpclib.Fault(err.code, err.text)
+            except RPCError as err:
+                value = xmlrpc.client.Fault(err.code, err.text)
 
             body = xmlrpc_marshal(value)
 
@@ -99,7 +99,7 @@ class DeferredXMLRPCResponse:
 
         if self.request.version == '1.0':
             if connection == 'keep-alive':
-                if not self.request.has_key ('Content-Length'):
+                if 'Content-Length' not in self.request:
                     close_it = 1
                 else:
                     self.request['Connection'] = 'Keep-Alive'
@@ -108,8 +108,8 @@ class DeferredXMLRPCResponse:
         elif self.request.version == '1.1':
             if connection == 'close':
                 close_it = 1
-            elif not self.request.has_key ('Content-Length'):
-                if self.request.has_key ('Transfer-Encoding'):
+            elif 'Content-Length' not in self.request:
+                if 'Transfer-Encoding' in self.request:
                     if not self.request['Transfer-Encoding'] == 'chunked':
                         close_it = 1
                 elif self.request.use_chunked:
@@ -117,7 +117,7 @@ class DeferredXMLRPCResponse:
                     wrap_in_chunking = 1
                 else:
                     close_it = 1
-        elif self.request.version is None:
+        elif self.request.version == None:
             close_it = 1
 
         outgoing_header = producers.simple_producer (
@@ -158,13 +158,13 @@ class DeferredXMLRPCResponse:
             self.request.channel.close_when_done()
 
 def xmlrpc_marshal(value):
-    ismethodresponse = not isinstance(value, xmlrpclib.Fault)
+    ismethodresponse = not isinstance(value, xmlrpc.client.Fault)
     if ismethodresponse:
         if not isinstance(value, tuple):
             value = (value,)
-        body = xmlrpclib.dumps(value,  methodresponse=ismethodresponse)
+        body = xmlrpc.client.dumps(value,  methodresponse=ismethodresponse)
     else:
-        body = xmlrpclib.dumps(value)
+        body = xmlrpc.client.dumps(value)
     return body
 
 class SystemNamespaceRPCInterface:
@@ -183,7 +183,7 @@ class SystemNamespaceRPCInterface:
                 # are published
                 func = getattr(namespace, method_name)
                 meth = getattr(func, 'im_func', None)
-                if meth is not None:
+                if meth != None:
                     if not method_name.startswith('_'):
                         sig = '%s.%s' % (ns_name, method_name)
                         methods[sig] = str(func.__doc__)
@@ -195,7 +195,7 @@ class SystemNamespaceRPCInterface:
         @return array result  An array of method names available (strings).
         """
         methods = self._listMethods()
-        keys = methods.keys()
+        keys = list(methods.keys())
         keys.sort()
         return keys
 
@@ -206,7 +206,7 @@ class SystemNamespaceRPCInterface:
         @return string result The documentation for the method name.
         """
         methods = self._listMethods()
-        for methodname in methods.keys():
+        for methodname in list(methods.keys()):
             if methodname == name:
                 return methods[methodname]
         raise RPCError(Faults.SIGNATURE_UNSUPPORTED)
@@ -231,7 +231,7 @@ class SystemNamespaceRPCInterface:
                         rtype = thing[2] # datatype
                     elif thing[1] == 'param': # tag name
                         ptypes.append(thing[2]) # datatype
-                if rtype is None:
+                if rtype == None:
                     raise RPCError(Faults.SIGNATURE_UNSUPPORTED)
                 return [rtype] + ptypes
         raise RPCError(Faults.SIGNATURE_UNSUPPORTED)
@@ -261,7 +261,7 @@ class SystemNamespaceRPCInterface:
             if callbacks:
                 try:
                     value = callbacks[0]()
-                except RPCError, exc:
+                except RPCError as exc:
                     value = {'faultCode': exc.code,
                              'faultString': exc.text}
                 except:
@@ -269,7 +269,7 @@ class SystemNamespaceRPCInterface:
                     errmsg = "%s:%s" % (info[0], info[1])
                     value = {'faultCode': Faults.FAILED,
                              'faultString': 'FAILED: ' + errmsg}
-                if value is not NOT_DONE_YET:
+                if value != NOT_DONE_YET:
                     callbacks.pop(0)
                     results.append(value)
 
@@ -281,7 +281,7 @@ class SystemNamespaceRPCInterface:
                 params = call.get('params', [])
 
                 try:
-                    if name is None:
+                    if name == None:
                         raise RPCError(Faults.INCORRECT_PARAMETERS,
                             'No methodName')
                     if name == 'system.multicall':
@@ -290,7 +290,7 @@ class SystemNamespaceRPCInterface:
                     # make the call, may return a callback or not
                     root = AttrDict(self.namespaces)
                     value = traverse(root, name, params)
-                except RPCError, exc:
+                except RPCError as exc:
                     value = {'faultCode': exc.code,
                              'faultString': exc.text}
                 except:
@@ -314,7 +314,7 @@ class SystemNamespaceRPCInterface:
         # optimization: multi() is called here instead of just returning
         # multi in case all calls complete and we can return with no delay.
         value = multi()
-        if value is NOT_DONE_YET:
+        if value == NOT_DONE_YET:
             return multi
         else:
             return value
@@ -331,10 +331,10 @@ class RootRPCInterface:
 
 def capped_int(value):
     i = int(value)
-    if i < xmlrpclib.MININT:
-        i = xmlrpclib.MININT
-    elif i > xmlrpclib.MAXINT:
-        i = xmlrpclib.MAXINT
+    if i < xmlrpc.client.MININT:
+        i = xmlrpc.client.MININT
+    elif i > xmlrpc.client.MAXINT:
+        i = xmlrpc.client.MAXINT
     return i
 
 def make_datetime(text):
@@ -355,7 +355,7 @@ class adminservice_xmlrpc_handler(xmlrpc_handler):
                 'cElementTree not installed, using slower XML parser for '
                 'XML-RPC'
                 )
-            self.loads = xmlrpclib.loads
+            self.loads = xmlrpc.client.loads
 
     def match(self, request):
         return request.uri.startswith(self.path)
@@ -385,7 +385,7 @@ class adminservice_xmlrpc_handler(xmlrpc_handler):
 
             # we allow xml-rpc clients that do not send empty <params>
             # when there are no parameters for the method call
-            if params is None:
+            if params == None:
                 params = ()
 
             try:
@@ -393,9 +393,9 @@ class adminservice_xmlrpc_handler(xmlrpc_handler):
                 value = self.call(method, params)
                 logger.trace('XML-RPC method %s() returned successfully' %
                              method)
-            except RPCError, err:
+            except RPCError as err:
                 # turn RPCError reported by method into a Fault instance
-                value = xmlrpclib.Fault(err.code, err.text)
+                value = xmlrpc.client.Fault(err.code, err.text)
                 logger.trace('XML-RPC method %s() returned fault: [%d] %s' % (
                     method,
                     err.code, err.text))
@@ -441,7 +441,7 @@ def traverse(ob, method, params):
         raise RPCError(Faults.UNKNOWN_METHOD)
 
     rpcinterface = getattr(ob, namespace, None)
-    if rpcinterface is None:
+    if rpcinterface == None:
         raise RPCError(Faults.UNKNOWN_METHOD)
 
     func = getattr(rpcinterface, method, None)
@@ -453,7 +453,7 @@ def traverse(ob, method, params):
     except TypeError:
         raise RPCError(Faults.INCORRECT_PARAMETERS)
 
-class AdminServiceTransport(xmlrpclib.Transport):
+class AdminServiceTransport(xmlrpc.client.Transport):
     """
     Provides a Transport for xmlrpclib that uses
     httplib.HTTPConnection in order to support persistent
@@ -462,22 +462,22 @@ class AdminServiceTransport(xmlrpclib.Transport):
     """
     connection = None
 
-    _use_datetime = 0 # python 2.5 fwd compatibility
+    _use_datetime = 0
     def __init__(self, username=None, password=None, serverurl=None):
         self.username = username
         self.password = password
         self.verbose = False
         self.serverurl = serverurl
         if serverurl.startswith('http://'):
-            type, uri = urllib.splittype(serverurl)
-            host, path = urllib.splithost(uri)
-            host, port = urllib.splitport(host)
-            if port is None:
+            type, uri = urllib.parse.splittype(serverurl)
+            host, path = urllib.parse.splithost(uri)
+            host, port = urllib.parse.splitport(host)
+            if port == None:
                 port = 80
             else:
                 port = int(port)
             def get_connection(host=host, port=port):
-                return httplib.HTTPConnection(host, port)
+                return http.client.HTTPConnection(host, port)
             self._get_connection = get_connection
         elif serverurl.startswith('unix://'):
             def get_connection(serverurl=serverurl):
@@ -500,9 +500,9 @@ class AdminServiceTransport(xmlrpclib.Transport):
                 }
 
             # basic auth
-            if self.username is not None and self.password is not None:
+            if self.username != None and self.password != None:
                 unencoded = "%s:%s" % (self.username, self.password)
-                encoded = base64.encodestring(unencoded).replace('\n', '')
+                encoded = base64.encodebytes(unencoded.encode('utf-8'))
                 self.headers["Authorization"] = "Basic %s" % encoded
 
         self.headers["Content-Length"] = str(len(request_body))
@@ -514,7 +514,7 @@ class AdminServiceTransport(xmlrpclib.Transport):
         if r.status != 200:
             self.connection.close()
             self.connection = None
-            raise xmlrpclib.ProtocolError(host + handler,
+            raise xmlrpc.client.ProtocolError(host + handler,
                                           r.status,
                                           r.reason,
                                           '' )
@@ -524,7 +524,7 @@ class AdminServiceTransport(xmlrpclib.Transport):
         p.close()
         return u.close()
 
-class UnixStreamHTTPConnection(httplib.HTTPConnection):
+class UnixStreamHTTPConnection(http.client.HTTPConnection):
     def connect(self):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         # we abuse the host parameter as the socketname
@@ -585,9 +585,9 @@ except ImportError:
         iterparse = None
 
 
-if iterparse is not None:
+if iterparse != None:
     import datetime, time
-    from base64 import decodestring
+    import base64
 
     unmarshallers = {
         "int": lambda x: int(x.text),
@@ -599,7 +599,7 @@ if iterparse is not None:
         "array": lambda x: x[0].text,
         "data": lambda x: [v.text for v in x],
         "struct": lambda x: dict([(k.text or "", v.text) for k, v in x]),
-        "base64": lambda x: decodestring(x.text or ""),
+        "base64": lambda x: base64.b64decode(x.text).decode('utf-8'),
         "param": lambda x: x[0].text,
     }
 

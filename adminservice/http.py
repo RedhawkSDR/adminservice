@@ -4,7 +4,7 @@ import time
 import sys
 import socket
 import errno
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import traceback
 
 try:
@@ -47,7 +47,7 @@ class deferring_chunked_producer:
     def more (self):
         if self.producer:
             data = self.producer.more()
-            if data is NOT_DONE_YET:
+            if data == NOT_DONE_YET:
                 return NOT_DONE_YET
             elif data:
                 return '%x\r\n%s\r\n' % (len(data), data)
@@ -70,7 +70,7 @@ class deferring_composite_producer:
         while len(self.producers):
             p = self.producers[0]
             d = p.more()
-            if d is NOT_DONE_YET:
+            if d == NOT_DONE_YET:
                 return NOT_DONE_YET
             if d:
                 return d
@@ -96,7 +96,7 @@ class deferring_globbing_producer:
     def more (self):
         while len(self.buffer) < self.buffer_size:
             data = self.producer.more()
-            if data is NOT_DONE_YET:
+            if data == NOT_DONE_YET:
                 return NOT_DONE_YET
             if data:
                 self.buffer = self.buffer + data
@@ -123,7 +123,7 @@ class deferring_hooked_producer:
     def more (self):
         if self.producer:
             result = self.producer.more()
-            if result is NOT_DONE_YET:
+            if result == NOT_DONE_YET:
                 return NOT_DONE_YET
             if not result:
                 self.producer = None
@@ -184,7 +184,7 @@ class deferring_http_request(http_server.http_request):
                     globbing = 0
                 else:
                     close_it = 1
-        elif self.version is None:
+        elif self.version == None:
             # Although we don't *really* support http/0.9 (because
             # we'd have to use \r\n as a terminator, and it would just
             # yuck up a lot of stuff) it's very common for developers
@@ -289,11 +289,11 @@ class deferring_http_request(http_server.http_request):
             key,value=header.split(":",1)
             key=key.lower()
             value=value.strip()
-            if header2env.has_key(key) and value:
+            if key in header2env and value:
                 env[header2env.get(key)]=value
             else:
                 key='HTTP_%s' % ("_".join(key.split( "-"))).upper()
-                if value and not env.has_key(key):
+                if value and key not in env:
                     env[key]=value
         return env
 
@@ -310,14 +310,14 @@ class deferring_http_request(http_server.http_request):
         else:
             protocol = 'http'
 
-        if environ.has_key('HTTP_HOST'):
+        if 'HTTP_HOST' in environ:
             host = environ['HTTP_HOST'].strip()
-            hostname, port = urllib.splitport(host)
+            hostname, port = urllib.parse.splitport(host)
         else:
             hostname = environ['SERVER_NAME'].strip()
             port = environ['SERVER_PORT']
 
-        if (port is None or default_port[protocol] == port):
+        if (port == None or default_port[protocol] == port):
             host = hostname
         else:
             host = hostname + ':' + port
@@ -336,7 +336,7 @@ class deferring_http_channel(http_server.http_channel):
     last_writable_check = 0 # timestamp of last writable check; 0 if never
 
     def writable(self, now=None):
-        if now is None:  # for unit tests
+        if now == None:  # for unit tests
             now = time.time()
 
         if self.delay:
@@ -357,7 +357,7 @@ class deferring_http_channel(http_server.http_channel):
                 p = self.producer_fifo.first()
                 # a 'None' in the producer fifo is a sentinel,
                 # telling us to close the channel.
-                if p is None:
+                if p == None:
                     if not self.ac_out_buffer:
                         self.producer_fifo.pop()
                         self.close()
@@ -369,7 +369,7 @@ class deferring_http_channel(http_server.http_channel):
 
                 data = p.more()
 
-                if data is NOT_DONE_YET:
+                if data == NOT_DONE_YET:
                     self.delay = p.delay
                     return
 
@@ -427,7 +427,7 @@ class deferring_http_channel(http_server.http_channel):
             self.request_counter.increment()
             self.server.total_requests.increment()
 
-            if command is None:
+            if command == None:
                 self.log_info ('Bad HTTP request: %s' % repr(request), 'error')
                 r.error (400)
                 return
@@ -508,7 +508,7 @@ class adminservice_http_server(http_server.http_server):
 
     def log_info(self, message, type='info'):
         ip = ''
-        if getattr(self, 'ip', None) is not None:
+        if getattr(self, 'ip', None) != None:
             ip = self.ip
         self.logger.log(ip, message)
 
@@ -591,7 +591,7 @@ class adminservice_af_unix_http_server(adminservice_http_server):
                 else:
                     try:
                         os.chown(socketname, sockchown[0], sockchown[1])
-                    except OSError, why:
+                    except OSError as why:
                         if why.args[0] == errno.EPERM:
                             msg = ('Not permitted to chown %s to uid/gid %s; '
                                    'adjust "sockchown" value in config file or '
@@ -621,7 +621,7 @@ class adminservice_af_unix_http_server(adminservice_http_server):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
             s.connect(socketname)
-            s.send("GET / HTTP/1.0\r\n\r\n")
+            s.send(bytes("GET / HTTP/1.0\r\n\r\n", 'utf-8'))
             s.recv(1)
             s.close()
         except socket.error:
@@ -720,18 +720,18 @@ class logtail_handler:
         group_name, process_name = split_namespec(process_name)
 
         group = self.adminserviced.process_groups.get(group_name)
-        if group is None:
+        if group == None:
             request.error(404) # not found
             return
 
         process = group.processes.get(process_name)
-        if process is None:
+        if process == None:
             request.error(404) # not found
             return
 
         logfile = getattr(process.config, '%s_logfile' % channel, None)
 
-        if logfile is None or not os.path.exists(logfile):
+        if logfile == None or not os.path.exists(logfile):
             # XXX problematic: processes that don't start won't have a log
             # file and we probably don't want to go into fatal state if we try
             # to read the log of a process that did not start.
@@ -765,7 +765,7 @@ class mainlogtail_handler:
 
         logfile = self.adminserviced.options.logfile
 
-        if logfile is None or not os.path.exists(logfile):
+        if logfile == None or not os.path.exists(logfile):
             request.error(410) # gone
             return
 
@@ -799,9 +799,9 @@ def make_http_servers(options, adminserviced):
         else:
             raise ValueError('Cannot determine socket type %r' % family)
 
-        from xmlrpc import adminservice_xmlrpc_handler
-        from xmlrpc import SystemNamespaceRPCInterface
-        from web import adminservice_ui_handler
+        from .xmlrpc import adminservice_xmlrpc_handler
+        from .xmlrpc import SystemNamespaceRPCInterface
+        from .web import adminservice_ui_handler
 
         subinterfaces = []
         for name, factory, d in options.rpcinterface_factories:
@@ -875,7 +875,7 @@ class encrypted_dictionary_authorizer:
 
     def authorize(self, auth_info):
         username, password = auth_info
-        if self.dict.has_key(username):
+        if username in self.dict:
             stored_password = self.dict[username]
             if stored_password.startswith('{SHA}'):
                 password_hash = sha1(password).hexdigest()
